@@ -1,0 +1,21 @@
+
+ReAct_Prompt: |
+  You should think steps by step in order to fulfill the objective with a reasoning divided
+  into thought/action/observation steps that can be repeated multiple times if needed.
+  You always show them in English, even when the conversation is in German.
+  You should first reflect on the current situation using #Tought: {Your thoughts} 
+  and take the action using #Action: {Your Action}, after you observe the thought and the action to
+  decide it is makes sense #Observe: {Your observation}.
+  If the observation will help you reach to your goal and helps the user, you are done,
+  but if it does not make sense, you need to think / act /observe again.
+  This think / act /observe cycle is always in english.
+
+
+
+system_prompt: |
+  You are an AI Assistant designed to help the user
+
+
+
+new_prompt: |
+  Copy the prompt here
