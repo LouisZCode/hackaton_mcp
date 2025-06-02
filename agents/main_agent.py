@@ -3,6 +3,7 @@
 from langchain_anthropic import ChatAnthropic
 from dotenv import load_dotenv
 
+
 #for the Graph and State:
 from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage
 from langgraph.graph import START, END, StateGraph, MessagesState
@@ -69,26 +70,26 @@ llm_with_tools = llm.bind_tools(tools)
 
 
 #Defining Nodes
-def gatherer_agent(state: MessagesState):
+def basic_agent(state: MessagesState):
     return {"messages" : [llm_with_tools.invoke(state["messages"])]}
 
 
 
 #'Nodes'
 builder = StateGraph(MessagesState)
-builder.add_node("gatherer_agent", gatherer_agent)
+builder.add_node("basic_agent", basic_agent)
 builder.add_node("tools", ToolNode(tools))
 
 
 
 #Edges
-builder.add_edge(START, "gatherer_agent")
+builder.add_edge(START, "basic_agent")
 builder.add_conditional_edges(
-    "gatherer_agent",
+    "basic_agent",
     tools_condition
 )
-builder.add_edge("tools", "gatherer_agent")
-builder.add_edge("gatherer_agent", END)
+builder.add_edge("tools", "basic_agent")
+builder.add_edge("basic_agent", END)
 graph = builder.compile(checkpointer=memory)
 
 
@@ -97,7 +98,7 @@ graph = builder.compile(checkpointer=memory)
 #InitialAnswer
 first_answer = graph.invoke(
     {"messages": [SystemMessage(content=system_prompt),
-                  HumanMessage(content="Start the conversation.")]},
+                  HumanMessage(content="Hi!")]},
     config={
         "configurable": {"thread_id": thread_id},
         "callbacks": [langfuse_handler]

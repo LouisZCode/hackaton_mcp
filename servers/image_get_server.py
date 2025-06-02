@@ -7,9 +7,8 @@ import gradio as gr
 import httpx
 from mcp.server.fastmcp import FastMCP
 
-# Initialize FastMCP server
-#Not being used as we are using Gradio for the Hackaton
-mcp = FastMCP("name")  #this param its only the name of the app
+#Actually needed, this defines the MCP and Decorators
+mcp = FastMCP("image_get")
 
 # Constants
 
@@ -18,6 +17,7 @@ mcp = FastMCP("name")  #this param its only the name of the app
 
 async def helper_function():
     """description"""
+
     #return 
     pass
 
@@ -42,10 +42,10 @@ async def resource_name():
 
 
 demo = gr.Interface(
-    fn=tool_name, #this is the function being used
-    inputs=gr.Textbox(placeholder="this is a template"),   #should match the number of Arguments
-    outputs=gr.JSON(),   #should match the number of return values
-    title="Template for the MCPs in Gradio",
+    fn=tool_name,
+    inputs=gr.Textbox(placeholder="this is a template"),
+    outputs=gr.JSON(),
+    title="Image Get MCP Server",
     description="This is just a Template"
 )
 
