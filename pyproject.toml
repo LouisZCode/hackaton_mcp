@@ -9,6 +9,7 @@ dependencies = [
     "gradio[mcp]>=5.32.0",
     "langchain>=0.3.25",
     "langchain-anthropic>=0.3.14",
+    "langchain-community>=0.3.24",
     "langfuse>=2.60.7",
     "langgraph>=0.4.7",
 ]
