@@ -1,0 +1,59 @@
+error type:,error example:,correction:,explanation:
+article_gender,"""Ich habe ein Tasse Kaffee getrunken.""","""Ich habe eine Tasse Kaffee getrunken.""","""Tasse is feminine, so it requires the feminine article 'eine' not the neutral 'ein'."""
+case_dative,"""Ich gebe der Mann das Buch.""","""Ich gebe dem Mann das Buch.""","""After the preposition 'zu', the noun requires the dative case, so 'der Mann' becomes 'dem Mann'."""
+verb_tense,"""Gestern ich gehe ins Kino.""","""Gestern ging ich ins Kino.""","""For past actions, use the simple past (Präteritum) or present perfect (Perfekt), not present tense."""
+article_gender,Der Mädchen spielt im Garten.,Das Mädchen spielt im Garten.,"Mädchen' is a neuter noun (das) despite referring to a female, because diminutives ending in -chen are always neuter."
+article_gender,Ich habe ein Tasse Kaffee getrunken.,Ich habe eine Tasse Kaffee getrunken.,"Tasse' is feminine, so it requires the feminine article 'eine' not the neutral 'ein'."
+article_gender,Wo ist die Auto?,Wo ist das Auto?,"Auto' is neuter in German, so it takes the article 'das' not 'die'."
+article_gender,Ich brauche der Schlüssel.,Ich brauche den Schlüssel.,"Schlüssel' is masculine, but in the accusative case (direct object) 'der' changes to 'den'."
+article_gender,Die Sonne und der Mond ist am Himmel.,Die Sonne und der Mond sind am Himmel.,"With multiple subjects, the verb must be plural ('sind' instead of 'ist')."
+case_dative,Ich gebe der Mann das Buch.,Ich gebe dem Mann das Buch.,"The indirect object 'Mann' requires the dative case, so 'der Mann' becomes 'dem Mann'."
+case_accusative,Ich sehe die Frau und der Mann.,Ich sehe die Frau und den Mann.,"Direct objects require accusative case, so 'der Mann' (nominative) must become 'den Mann' (accusative)."
+case_genitive,Das Auto mein Vater ist rot.,Das Auto meines Vaters ist rot.,"In the genitive case, masculine and neuter nouns add -s or -es and 'mein' becomes 'meines'."
+case_accusative,Ich mag der Film.,Ich mag den Film.,"After the verb 'mögen' (to like), the object is in accusative case, so 'der Film' becomes 'den Film'."
+case_preposition,Ich warte auf der Bus.,Ich warte auf den Bus.,The preposition 'auf' requires accusative case when indicating direction or waiting for something.
+verb_tense,Gestern ich gehe ins Kino.,Gestern ging ich ins Kino.,"For past actions, use the simple past (Präteritum) or present perfect (Perfekt), not present tense."
+verb_tense,Morgen ich bin zu Hause geblieben.,Morgen bleibe ich zu Hause.,"Future actions require present tense or future tense in German, not perfect tense."
+verb_tense,Ich habe das Buch gelesen seit drei Stunden.,Ich lese das Buch seit drei Stunden.,"With 'seit' (since/for), use present tense for actions continuing into the present, not perfect tense."
+verb_position,Gestern ich bin ins Kino gegangen.,Gestern bin ich ins Kino gegangen.,"In German, the conjugated verb must always be in the second position in main clauses."
+verb_position,Ich weiß dass er kommt morgen.,"Ich weiß, dass er morgen kommt.","In subordinate clauses (after 'dass', 'weil', etc.), the verb must go to the end of the clause."
+verb_position,"Weil ich bin müde, gehe ich schlafen.","Weil ich müde bin, gehe ich schlafen.","After 'weil' (because), the verb must go to the end of the clause."
+modal_verb,Ich muss zu gehen jetzt.,Ich muss jetzt gehen.,"Modal verbs require the infinitive without 'zu', and the infinitive goes to the end of the clause."
+modal_verb,Du nicht sollst so laut sprechen.,Du sollst nicht so laut sprechen.,"Negation with 'nicht' comes after the modal verb, not before it."
+modal_verb,Ich kann nicht schwimmen gehen.,Ich kann nicht schwimmen gehen.,"With modal verbs and another infinitive, the modal is conjugated and the other verb goes to the end."
+separable_verb,Ich rufe meine Mutter morgen an.,Ich rufe morgen meine Mutter an.,"With separable verbs, the prefix 'an' goes to the end, but adverbs like 'morgen' come before objects."
+separable_verb,Ich anrufe meine Mutter.,Ich rufe meine Mutter an.,"With separable verbs, the prefix 'an' separates and goes to the end of the clause in conjugated forms."
+separable_verb,Wenn ich anrufe meine Mutter...,Wenn ich meine Mutter anrufe...,"In subordinate clauses, separable verbs stay together and go to the end of the clause."
+reflexive_verb,Ich erinnere das Buch.,Ich erinnere mich an das Buch.,Erinnern' is reflexive in German ('sich erinnern an') and requires the reflexive pronoun 'mich'.
+reflexive_verb,Ich wasche mich den Kopf.,Ich wasche mir den Kopf.,Some reflexive actions use dative reflexive pronouns (mir) instead of accusative (mich).
+reflexive_verb,Ich freue für deinen Erfolg.,Ich freue mich über deinen Erfolg.,Sich freuen' is reflexive and requires the reflexive pronoun 'mich' and the preposition 'über'.
+preposition,Ich warte für dich.,Ich warte auf dich.,"The verb 'warten' requires the preposition 'auf' + accusative, not 'für'."
+preposition,Ich denke an zu gehen.,Ich denke daran zu gehen.,"When 'an' is followed by 'zu' + infinitive, it combines with 'da' to form 'daran'."
+preposition,Ich fahre mit Bus.,Ich fahre mit dem Bus.,"Prepositions like 'mit' (with) must be followed by a noun with an article, not a bare noun."
+preposition,Sie wohnt bei ihrer Großmutter.,Sie wohnt bei ihrer Großmutter.,This is actually correct! 'Bei' means 'at the home of' or 'with' when referring to living arrangements.
+preposition,Ich sorge über meine Katze.,Ich sorge für meine Katze.,"The verb 'sorgen' requires the preposition 'für' (for), not 'über' (about)."
+word_order,Ich gehe morgen zur Schule mit meinem Freund.,Ich gehe morgen mit meinem Freund zur Schule.,"German word order typically follows the TeKaMoLo rule: temporal, causal, modal, local."
+word_order,Ich lese gern Bücher im Bett gestern.,Ich habe gestern gern Bücher im Bett gelesen.,"Temporal expressions like 'gestern' typically come early in the sentence, not at the end."
+word_order,Ich kann sehen den Film.,Ich kann den Film sehen.,"In German, the infinitive 'sehen' must go to the end of the clause after the object."
+word_order,Sie hat gegessen schnell.,Sie hat schnell gegessen.,Adverbs like 'schnell' come before the past participle at the end of the sentence.
+word_order,Wir haben gekauft ein neues Auto.,Wir haben ein neues Auto gekauft.,The past participle 'gekauft' must go to the end of the clause after the object.
+adjective_ending,Ein groß Mann steht dort.,Ein großer Mann steht dort.,"After the indefinite article 'ein', masculine adjectives in nominative case take the ending -er."
+adjective_ending,Das ist ein schöne Haus.,Das ist ein schönes Haus.,"For neuter nouns with indefinite articles, adjectives take the ending -es."
+adjective_ending,Mit kalten Wasser waschen.,Mit kaltem Wasser waschen.,"In dative case with neuter nouns, adjectives take the ending -em."
+adjective_ending,Ich sehe die alte Frauen.,Ich sehe die alten Frauen.,"With plural nouns, adjectives take the ending -en regardless of case."
+formal_vs_informal,"Woher kommst du, Herr Schmidt?","Woher kommen Sie, Herr Schmidt?","When addressing someone formally (with 'Herr'), use the formal 'Sie' form, not the informal 'du'."
+formal_vs_informal,"Können Sie mir helfen, Oma?","Kannst du mir helfen, Oma?","When addressing family members like 'Oma', the informal 'du' form is typically used."
+formal_vs_informal,"Haben Sie einen schönen Tag, mein Freund.","Hab einen schönen Tag, mein Freund.","When addressing a friend, use the informal 'du' form, which makes 'haben' become 'hab'."
+formal_vs_informal,"Sie sind aber pünktlich, Lisa!","Du bist aber pünktlich, Lisa!","When addressing someone by their first name, the informal 'du' form is typically used."
+negation,Ich habe kein Zeit.,Ich habe keine Zeit.,"Zeit' is feminine, so the negative article is 'keine', not 'kein'."
+negation,Ich trinke nicht Kaffee.,Ich trinke keinen Kaffee.,"When negating a noun with an article, use 'kein/keine/keinen' instead of 'nicht'."
+negation,Ich esse nicht.,Ich esse nicht.,This is correct! Use 'nicht' to negate verbs without objects.
+negation,Er hat nicht gesehen den Film.,Er hat den Film nicht gesehen.,Nicht' typically comes before the past participle at the end of the sentence.
+negation,Niemand ist gekommen nicht.,Niemand ist gekommen.,Don't use double negation in German; 'niemand' already means 'nobody'.
+plural_form,Die Manns kommen heute.,Die Männer kommen heute.,The plural of 'Mann' is irregular: 'Männer' with umlaut and -er ending.
+plural_form,Ich sehe viele Kinds.,Ich sehe viele Kinder.,"The plural of 'Kind' is 'Kinder', an irregular plural form."
+plural_form,Drei Apfels liegen auf dem Tisch.,Drei Äpfel liegen auf dem Tisch.,Apfel' forms its plural with an umlaut but no ending: 'Äpfel'.
+plural_form,Die Fraus sprechen Deutsch.,Die Frauen sprechen Deutsch.,"The plural of 'Frau' is 'Frauen', adding -en."
+conjunction,"Ich komme nicht, weil ich bin krank.","Ich komme nicht, weil ich krank bin.","After subordinating conjunctions like 'weil', the verb goes to the end of the clause."
+conjunction,"Ich bleibe zu Hause, oder ich gehe ins Kino.","Ich bleibe zu Hause, oder ich gehe ins Kino.","This is correct! After coordinating conjunctions like 'oder', the normal word order continues."
+conjunction,"Wenn ist schönes Wetter, gehen wir spazieren.","Wenn schönes Wetter ist, gehen wir spazieren.","In subordinate clauses starting with 'wenn', the verb goes to the end of the clause."

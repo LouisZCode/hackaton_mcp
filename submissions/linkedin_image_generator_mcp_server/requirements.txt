@@ -1,0 +1,5 @@
+gradio[mcp]>=5.32.0
+pillow>=10.0.0
+requests>=2.28.0
+httpx>=0.24.0
+mcp>=0.1.0
