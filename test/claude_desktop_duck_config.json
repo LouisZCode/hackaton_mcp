@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "duck-detector": {
+      "command": "C:/projects/GitHub/hackaton_mcp/.venv/Scripts/python.exe",
+      "args": ["C:/projects/GitHub/hackaton_mcp/test/duck_detector_mcp.py"],
+      "env": {}
+    }
+  }
+}
