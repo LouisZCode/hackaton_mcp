@@ -9,7 +9,12 @@ from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage, AIM
 from langgraph.graph import START, END, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 
-from langfuse.callback import CallbackHandler
+try:
+    from langfuse.langchain import CallbackHandler
+    LANGFUSE_AVAILABLE = True
+except ImportError:
+    LANGFUSE_AVAILABLE = False
+    CallbackHandler = None
 import yaml
 
 import sys
@@ -38,11 +43,14 @@ trace_name = "11May_WebSearch_test4"
 #memory:
 thread_id = "thread_11May_number_6"
 
-langfuse_handler = CallbackHandler(
-    session_id=session_id, 
-    user_id=user_id, 
-    trace_name=trace_name
-)
+if LANGFUSE_AVAILABLE:
+    langfuse_handler = CallbackHandler(
+        session_id=session_id, 
+        user_id=user_id, 
+        trace_name=trace_name
+    )
+else:
+    langfuse_handler = None
 
 
 
@@ -67,18 +75,31 @@ web_search_tool = {
 }
 
 # Initialize the LLM
-llm = ChatAnthropic(
-    model="claude-3-7-sonnet-latest",
-    temperature=0,
-        model_kwargs={
-        "tools": [{
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": 2
-        }]
-    },
-    callbacks=[langfuse_handler]
-)
+if LANGFUSE_AVAILABLE and langfuse_handler:
+    llm = ChatAnthropic(
+        model="claude-3-7-sonnet-latest",
+        temperature=0,
+            model_kwargs={
+            "tools": [{
+                "type": "web_search_20250305",
+                "name": "web_search",
+                "max_uses": 2
+            }]
+        },
+        callbacks=[langfuse_handler]
+    )
+else:
+    llm = ChatAnthropic(
+        model="claude-3-7-sonnet-latest",
+        temperature=0,
+            model_kwargs={
+            "tools": [{
+                "type": "web_search_20250305",
+                "name": "web_search",
+                "max_uses": 2
+            }]
+        }
+    )
 
 # Define our state structure
 class TutorState(TypedDict):

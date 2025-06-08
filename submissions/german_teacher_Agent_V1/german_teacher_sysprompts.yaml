@@ -1,4 +1,3 @@
-
 ReAct_Prompt: |
   You should think steps by step in order to fulfill the objective with a reasoning divided
   into thought/action/observation steps that can be repeated multiple times if needed.
@@ -70,7 +69,7 @@ conversation_mode: |
   "Hi {name} and willkommen! lets practice some German, we will talk about {selected_hobbie}"
   If the student_german_level = intermediate or advanced, then you say:
   "Hallo {name} und willkommen! Lass uns ein bisschen Deutsch üben,
-  wir werden über {selected_hobbie} sprechen“
+  wir werden über {selected_hobbie} sprechen"
 
   Your goal is to have a small conversation in German with the student on his or her appropriate 
   level and get 3 answers from the student.

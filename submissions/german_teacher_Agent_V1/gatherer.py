@@ -20,7 +20,12 @@ from langgraph.checkpoint.memory import MemorySaver
 #For the database / Tools
 from langgraph.prebuilt import ToolNode, tools_condition
 #for the LangFuse Observability
-from langfuse.callback import CallbackHandler
+try:
+    from langfuse.langchain import CallbackHandler
+    LANGFUSE_AVAILABLE = True
+except ImportError:
+    LANGFUSE_AVAILABLE = False
+    CallbackHandler = None
 #For the prompt import:
 import yaml
 
@@ -46,20 +51,29 @@ user_id = "Luis_Tester"
 trace_name = "7May_SysPrompt_test1"
 #memory:
 thread_id = "thread_7May_number_3"
-langfuse_handler = CallbackHandler(
-    session_id=session_id, 
-    user_id=user_id, 
-    trace_name=trace_name
-)
+if LANGFUSE_AVAILABLE:
+    langfuse_handler = CallbackHandler(
+        session_id=session_id, 
+        user_id=user_id, 
+        trace_name=trace_name
+    )
+else:
+    langfuse_handler = None
 
 #NOTE Model:
 #best model:   claude-3-7-sonnet-latest
 #chep and fast model:  claude-3-5-haiku-latest
-llm = ChatAnthropic(
-    model="claude-3-7-sonnet-latest",
-    temperature=0,
-    callbacks=[langfuse_handler]  # Pass callbacks at initialization
-)
+if LANGFUSE_AVAILABLE and langfuse_handler:
+    llm = ChatAnthropic(
+        model="claude-3-7-sonnet-latest",
+        temperature=0,
+        callbacks=[langfuse_handler]  # Pass callbacks at initialization
+    )
+else:
+    llm = ChatAnthropic(
+        model="claude-3-7-sonnet-latest",
+        temperature=0
+    )
 
 #NOTE TOOLS
 def save_initial_profile(name, language_level, hobbies, student_id=None, db_path=None):

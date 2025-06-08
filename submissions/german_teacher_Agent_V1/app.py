@@ -69,7 +69,7 @@ class GradioConversationAgent:
 - Selected Topic: {selected_hobby}
 - Interests: {', '.join(hobbies)}
 
-🇩🇪 **Let's start your German lesson:**
+**Let's start your German lesson:**
 """
             
             history = [(welcome_info, clean_response)]
@@ -274,7 +274,7 @@ def get_conversation_agent():
 # Create Gradio interface
 with gr.Blocks(title="German Language Learning - AI Powered", theme=gr.themes.Soft()) as demo:
     gr.Markdown("""
-    # 🇩🇪 German Language Learning - AI Powered
+    # German Language Learning - AI Powered
     ### Multi-Agent System for Personalized German Education
     *Hackathon submission for Agents-MCP-Hackathon 2025*
     """)
