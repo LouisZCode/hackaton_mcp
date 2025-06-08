@@ -1,0 +1,20 @@
+# German Language Learning Multi-Agent System
+# Hackathon submission for Agents-MCP-Hackathon 2025
+
+# Core LLM and AI frameworks
+langchain-anthropic>=0.3.0
+langgraph>=0.2.0
+langchain-core>=0.3.0
+
+# UI and Interface
+gradio>=5.0.0
+
+# Data handling
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Observability and monitoring
+langfuse>=2.0.0
+
+# System utilities
+IPython>=8.0.0

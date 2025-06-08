@@ -6,7 +6,9 @@
       "Bash(python:*)",
       "Bash(ls:*)",
       "WebFetch(domain:modelcontextprotocol.io)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebFetch(domain:docs.nebius.com)",
+      "WebFetch(domain:studio.nebius.com)"
     ],
     "deny": []
   }
