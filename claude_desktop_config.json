@@ -1,0 +1,58 @@
+{
+  "mcpServers": {
+    "brave-search": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "BRAVE_API_KEY",
+        "mcp/brave-search"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "BSA_dPsaQgYA_mxzUoW5c2M0m1U1Mb5"
+      }
+    },
+    "filesystem": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--mount", "type=bind,src=C:/Users/Admin/Documents/GitHub,dst=/projects/GitHub",
+        "mcp/filesystem",
+        "/projects"
+      ]
+    },
+    "memory": {
+      "command": "docker",
+      "args": ["run", "-i", "-v", "claude-memory:/app/dist", "--rm", "mcp/memory"]
+    },
+    "puppeteer": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "--init", "-e", "DOCKER_CONTAINER=true", "mcp/puppeteer"]
+    },
+    "google-maps": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GOOGLE_MAPS_API_KEY",
+        "mcp/google-maps"
+      ],
+      "env": {
+        "GOOGLE_MAPS_API_KEY": "AIzaSyDLZUsxCYDDnShuEjanSl5XOOy-BWDhpEg"
+      }
+    },
+    "notionApi": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "env": {
+        "OPENAPI_MCP_HEADERS": "{\"Authorization\": \"Bearer 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\", \"Notion-Version\": \"2022-06-28\" }"
+      }
+    }
+  }
+}

@@ -4,7 +4,9 @@
       "Bash(mkdir:*)",
       "Bash(cp:*)",
       "Bash(python:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "WebFetch(domain:modelcontextprotocol.io)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

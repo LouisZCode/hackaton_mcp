@@ -546,6 +546,7 @@ dependencies = [
     { name = "langchain-community" },
     { name = "langfuse" },
     { name = "langgraph" },
+    { name = "mcp", extra = ["cli"] },
 ]
 
 [package.metadata]
@@ -557,6 +558,7 @@ requires-dist = [
     { name = "langchain-community", specifier = ">=0.3.24" },
     { name = "langfuse", specifier = ">=2.60.7" },
     { name = "langgraph", specifier = ">=0.4.7" },
+    { name = "mcp", extras = ["cli"], specifier = ">=1.9.0" },
 ]
 
 [[package]]
@@ -978,6 +980,12 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/bc/8d/0f4468582e9e97b0a24604b585c651dfd2144300ecffd1c06a680f5c8861/mcp-1.9.0.tar.gz", hash = "sha256:905d8d208baf7e3e71d70c82803b89112e321581bcd2530f9de0fe4103d28749", size = 281432, upload-time = "2025-05-15T18:51:06.615Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a5/d5/22e36c95c83c80eb47c83f231095419cf57cf5cca5416f1c960032074c78/mcp-1.9.0-py3-none-any.whl", hash = "sha256:9dfb89c8c56f742da10a5910a1f64b0d2ac2c3ed2bd572ddb1cfab7f35957178", size = 125082, upload-time = "2025-05-15T18:51:04.916Z" },
+]
+
+[package.optional-dependencies]
+cli = [
+    { name = "python-dotenv" },
+    { name = "typer" },
 ]
 
 [[package]]

@@ -68,18 +68,22 @@ async def detect_emotion_from_text(text: str) -> str:
     return response_text
 
 
-@mcp.resource("config://emotions")
-async def emotion_config():
-    """Emotion detection configuration and supported emotions
+@mcp.prompt()
+async def emotion_prompt(emotion: str) -> str:
+    """Get a simple explanation prompt for each detected emotion
+    
+    Args:
+        emotion: The emotion type (happy, sad, angry, surprised, neutral)
     """
-    return {
-        "supported_emotions": ["Happy", "Sad", "Neutral"],
-        "keywords": {
-            "happy": ["happy", "joy", "good", "great", "wonderful", "amazing"],
-            "sad": ["sad", "bad", "terrible", "awful", "horrible", "depressed"],
-            "neutral": ["neutral", "okay", "normal", "fine"]
-        }
+    prompts = {
+        "happy": "This person is feeling joy and positivity. They're in a good mood and expressing contentment.",
+        "sad": "This person is experiencing sadness or disappointment. They may need comfort or understanding.",
+        "angry": "This person is feeling frustrated or upset. They're expressing anger or irritation about something.",
+        "surprised": "This person is amazed or shocked by something unexpected. They're experiencing wonder or disbelief.",
+        "neutral": "This person has a calm, balanced emotional state. No strong emotions are being expressed."
     }
+    
+    return prompts.get(emotion.lower(), "Unknown emotion detected.")
 
 
 demo = gr.Interface(
@@ -89,8 +93,8 @@ demo = gr.Interface(
         gr.Image(type="pil", label="Emotion Visualization"),
         gr.Textbox(label="Emotion Analysis")
     ],
-    title="Emotion Detection MCP Server",
-    description="Analyze text for emotional content and generate visual representation"
+    title="Emotion Prompt Creation MCP Server",
+    description="Analyze text for emotional content and generate Prompt + visual representation"
 )
 
 if __name__ == "__main__":
