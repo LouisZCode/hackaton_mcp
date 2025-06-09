@@ -1,0 +1,25 @@
+# Resume Improver Multi-Agent System Dependencies
+
+# Core LLM and AI frameworks
+langchain-anthropic>=0.3.0
+langgraph>=0.2.0
+langchain-core>=0.3.0
+
+# UI and Interface
+gradio>=5.0.0
+
+# PDF Processing (All-in-One with PyMuPDF)
+PyMuPDF>=1.24.0
+
+# Image Processing
+pillow>=10.0.0
+
+# Data handling
+python-dotenv>=1.0.0
+pyyaml>=6.0
+
+# Observability and monitoring
+langfuse>=2.0.0
+
+# System utilities
+IPython>=8.0.0
