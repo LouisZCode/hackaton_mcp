@@ -509,9 +509,6 @@ def create_interface():
                 image_analysis_btn = gr.Button("🔍 Get Face Detection Analysis")
                 image_analysis_display = gr.Markdown()
             
-            with gr.TabItem("📥 Export Data"):
-                export_btn = gr.Button("📥 Export Processing Data (JSON)")
-                export_file = gr.File(label="Download Processing Data")
         
         def handle_file_upload(file):
             """Handle file upload with automatic processing"""
@@ -550,11 +547,6 @@ def create_interface():
         image_analysis_btn.click(
             fn=app.get_image_analysis,
             outputs=[image_analysis_display]
-        )
-        
-        export_btn.click(
-            fn=app.export_processing_data,
-            outputs=[export_file]
         )
     
     return interface
