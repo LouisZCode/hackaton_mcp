@@ -11,6 +11,7 @@ import logging
 
 from pdf_processor import PDFProcessor, process_pdf
 from utils import setup_logging, PDFProcessingError, PDFValidationError, format_file_size
+from agent_template import ResumeAnalyzerAgent
 
 # Setup logging
 logger = setup_logging()
@@ -22,6 +23,8 @@ class ResumeImproverApp:
         self.current_pdf_data = None
         self.processor = PDFProcessor()
         self.temp_image_dir = None
+        self.resume_analyzer = ResumeAnalyzerAgent()
+        self.current_analysis = None
         
     def upload_and_process_pdf(self, file) -> Tuple[str, str, str, List, List]:
         """
@@ -133,21 +136,10 @@ class ResumeImproverApp:
         import tempfile
         import base64
         
-        # Create temp directory if needed with shorter path
+        # Create temp directory if needed - use system temp for Gradio security
         if not self.temp_image_dir:
-            # Use C:\temp for Windows to avoid long paths
-            try:
-                import platform
-                if platform.system() == "Windows":
-                    base_temp = "C:\\temp"
-                    os.makedirs(base_temp, exist_ok=True)
-                    self.temp_image_dir = os.path.join(base_temp, "resume_imgs")
-                    os.makedirs(self.temp_image_dir, exist_ok=True)
-                else:
-                    self.temp_image_dir = tempfile.mkdtemp(prefix="img_")
-            except:
-                # Fallback to system temp with shorter prefix
-                self.temp_image_dir = tempfile.mkdtemp(prefix="img_")
+            # Always use system temp directory for Gradio compatibility
+            self.temp_image_dir = tempfile.mkdtemp(prefix="resume_", suffix="_imgs")
         
         # Decode base64 image
         image_bytes = base64.b64decode(base64_data)
@@ -160,26 +152,6 @@ class ResumeImproverApp:
         
         return temp_path
     
-    def get_detailed_text_analysis(self) -> str:
-        """Get detailed text analysis for the current PDF"""
-        if not self.current_pdf_data:
-            return "No PDF processed yet."
-        
-        text_data = self.current_pdf_data['text_data']
-        
-        analysis_md = "## 📝 **Detailed Text Analysis**\n\n"
-        
-        for page_data in text_data['pages']:
-            analysis_md += f"""
-### Page {page_data['page_number']}
-- **Characters:** {page_data['char_count']:,}
-- **Words:** {page_data['word_count']:,}
-- **Text Blocks:** {page_data['blocks']}
-- **Has Text:** {'Yes' if page_data['has_text'] else 'No'}
-
-"""
-        
-        return analysis_md
     
     def get_image_analysis(self) -> str:
         """Get detailed image analysis for the current PDF"""
@@ -205,6 +177,100 @@ class ResumeImproverApp:
 """
         
         return analysis_md
+    
+    def analyze_resume_with_claude(self) -> str:
+        """Run Claude analysis on the current resume"""
+        if not self.current_pdf_data:
+            return "❌ **No PDF processed yet.** Please upload and process a PDF first."
+        
+        try:
+            logger.info("Starting Claude resume analysis")
+            
+            # Generate session ID for this analysis with timestamp
+            import uuid
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            session_id = f"gradio_{timestamp}_{uuid.uuid4().hex[:6]}"
+            
+            logger.info(f"Created analysis session: {session_id}")
+            
+            # Run the analysis
+            result = self.resume_analyzer.analyze_complete_pdf_data(
+                self.current_pdf_data, 
+                session_id=session_id
+            )
+            
+            if result["success"]:
+                self.current_analysis = result
+                
+                # Format the analysis for display
+                analysis_md = f"""
+# 🎯 **Claude Resume Analysis**
+
+## 📊 **Analysis Metadata**
+- **Model:** {result['metadata']['model_used']}
+- **Input Length:** {result['metadata']['input_length']:,} characters
+- **Analysis Length:** {result['metadata']['response_length']:,} characters  
+- **Session ID:** {result['metadata']['session_id']}
+
+---
+
+## 📝 **Detailed Analysis & Recommendations**
+
+{result['analysis']}
+
+---
+
+*💡 Analysis completed successfully! Use this feedback to improve your resume.*
+"""
+                
+                logger.info(f"Claude analysis completed successfully for session: {session_id}")
+                return analysis_md
+                
+            else:
+                error_msg = f"""
+# ❌ **Analysis Failed**
+
+**Error:** {result['error']}
+
+**Session ID:** {result.get('session_id', 'unknown')}
+
+Please try again or check your API configuration.
+"""
+                logger.error(f"Claude analysis failed: {result['error']}")
+                return error_msg
+                
+        except Exception as e:
+            error_msg = f"""
+# ❌ **Analysis Error**
+
+**Unexpected Error:** {str(e)}
+
+Please check your internet connection and API configuration.
+"""
+            logger.error(f"Claude analysis error: {str(e)}")
+            return error_msg
+    
+    def get_analysis_summary(self) -> str:
+        """Get a summary of the current analysis"""
+        if not self.current_analysis:
+            return "No analysis available. Run Claude analysis first."
+        
+        metadata = self.current_analysis["metadata"]
+        
+        summary = f"""
+## 📋 **Analysis Summary**
+
+- **Status:** ✅ Complete
+- **Model Used:** {metadata['model_used']}
+- **Resume Length:** {metadata['input_length']:,} characters
+- **Analysis Length:** {metadata['response_length']:,} characters
+- **Session:** {metadata['session_id']}
+
+### 🎯 **Key Points:**
+*Run full analysis above to see detailed recommendations*
+"""
+        return summary
     
     def export_processing_data(self) -> str:
         """Export current processing data as JSON"""
@@ -240,6 +306,13 @@ class ResumeImproverApp:
             ],
             'processing_summary': self.current_pdf_data['processing_summary']
         }
+        
+        # Add Claude analysis if available
+        if self.current_analysis:
+            export_data['claude_analysis'] = {
+                'analysis_text': self.current_analysis['analysis'],
+                'metadata': self.current_analysis['metadata']
+            }
         
         # Save to temp file
         import tempfile
@@ -337,13 +410,27 @@ def create_interface():
         
         # Analysis Tabs
         with gr.Tabs():
-            with gr.TabItem("📊 Text Analysis"):
-                text_analysis_btn = gr.Button("🔍 Get Detailed Text Analysis")
-                text_analysis_display = gr.Markdown()
+            with gr.TabItem("🎯 Experience Analysis"):
+                gr.Markdown("### 🤖 **AI-Powered Resume Analysis**")
+                gr.Markdown("Get detailed improvement recommendations from Claude AI")
+                
+                claude_analysis_btn = gr.Button(
+                    "🚀 Analyze Resume with Claude", 
+                    variant="primary",
+                    size="lg"
+                )
+                claude_analysis_display = gr.Markdown(
+                    "Click the button above to start AI analysis...",
+                    label="Experience Analysis Results"
+                )
             
             with gr.TabItem("🖼️ Image Analysis"):
                 image_analysis_btn = gr.Button("🔍 Get Detailed Image Analysis")
                 image_analysis_display = gr.Markdown()
+            
+            with gr.TabItem("📋 Analysis Summary"):
+                summary_btn = gr.Button("📋 Get Analysis Summary")
+                summary_display = gr.Markdown()
             
             with gr.TabItem("💾 Export Data"):
                 export_btn = gr.Button("📥 Export Processing Data (JSON)")
@@ -362,14 +449,19 @@ def create_interface():
             ]
         )
         
-        text_analysis_btn.click(
-            fn=app.get_detailed_text_analysis,
-            outputs=[text_analysis_display]
+        claude_analysis_btn.click(
+            fn=app.analyze_resume_with_claude,
+            outputs=[claude_analysis_display]
         )
         
         image_analysis_btn.click(
             fn=app.get_image_analysis,
             outputs=[image_analysis_display]
+        )
+        
+        summary_btn.click(
+            fn=app.get_analysis_summary,
+            outputs=[summary_display]
         )
         
         export_btn.click(
@@ -381,9 +473,17 @@ def create_interface():
         gr.Markdown("""
         ---
         ### 🛠️ **Development Notes:**
-        - Using PyMuPDF for all PDF operations
-        - Phase 1: Testing PDF processing foundation
-        - Next Phase: Add AI agents for resume analysis
+        - **PDF Processing:** PyMuPDF for text, images, and metadata extraction
+        - **AI Analysis:** Claude 3.7 Sonnet via LangGraph for expert resume feedback
+        - **Observability:** LangFuse integration for tracking and monitoring
+        - **Phase 2:** AI-powered resume analysis now available! 🚀
+        """)
+        
+        gr.Markdown("""
+        ### 🎯 **Workflow:**
+        1. **Upload PDF** → Extract text and images
+        2. **Claude Analysis** → Get AI-powered improvement recommendations  
+        3. **Export Results** → Download complete analysis and suggestions
         """)
     
     return interface
