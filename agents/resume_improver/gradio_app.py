@@ -204,14 +204,23 @@ class ResumeImproverApp:
                 self.current_analysis = result
                 
                 # Format the analysis for display
+                metadata = result['metadata']
+                analysis_type = metadata.get('analysis_type', 'text_only')
+                visual_analysis_enabled = metadata.get('visual_analysis_enabled', False)
+                
+                # Analysis type indicator
+                analysis_type_icon = "🎨 **Multi-Modal Analysis**" if analysis_type == "multimodal" else "📝 **Text-Only Analysis**"
+                
                 analysis_md = f"""
 # 🎯 **Claude Resume Analysis**
 
 ## 📊 **Analysis Metadata**
-- **Model:** {result['metadata']['model_used']}
-- **Input Length:** {result['metadata']['input_length']:,} characters
-- **Analysis Length:** {result['metadata']['response_length']:,} characters  
-- **Session ID:** {result['metadata']['session_id']}
+- **Type:** {analysis_type_icon}
+- **Model:** {metadata['model_used']}
+- **Input Length:** {metadata['input_length']:,} characters
+- **Analysis Length:** {metadata['response_length']:,} characters  
+- **Visual Analysis:** {'✅ Enabled' if visual_analysis_enabled else '❌ Disabled'}
+- **Session ID:** {metadata['session_id']}
 
 ---
 

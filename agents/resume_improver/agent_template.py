@@ -18,7 +18,14 @@ import yaml
 import logging
 import datetime
 
-from utils import setup_logging, ResumeProcessingError
+from utils import (
+    setup_logging, 
+    ResumeProcessingError, 
+    MAX_PAGE_IMAGES_FOR_ANALYSIS,
+    IMAGE_DPI_FOR_ANALYSIS,
+    MAX_IMAGE_SIZE_BYTES,
+    ENABLE_VISUAL_ANALYSIS_BY_DEFAULT
+)
 import re
 
 # Setup
@@ -116,6 +123,8 @@ class ResumeAnalysisState(TypedDict):
     session_id: Optional[str]
     processing_status: str  # "pending", "analyzing", "complete", "error"
     error_message: Optional[str]
+    visual_analysis_enabled: bool  # Whether to include page images in analysis
+    image_processing_status: Optional[str]  # "pending", "processing", "complete", "error"
 
 class ResumeAnalyzerAgent:
     """Basic LangGraph agent for resume text analysis"""
@@ -136,7 +145,29 @@ class ResumeAnalyzerAgent:
         self.graph = self._build_graph()
         
     def _load_system_prompt(self) -> str:
-        """Load system prompt - for now use a basic one"""
+        """Load system prompt from YAML file"""
+        try:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            yaml_path = os.path.join(script_dir, 'prompts.yaml')
+            
+            with open(yaml_path, 'r') as file:
+                prompts = yaml.safe_load(file)
+            
+            system_prompt = prompts.get('resume_analyzer_system_prompt', '')
+            
+            if not system_prompt:
+                logger.warning("System prompt not found in YAML, using fallback")
+                return self._fallback_system_prompt()
+            
+            logger.info("Successfully loaded system prompt from prompts.yaml")
+            return system_prompt
+            
+        except Exception as e:
+            logger.error(f"Failed to load system prompt from YAML: {e}")
+            return self._fallback_system_prompt()
+    
+    def _fallback_system_prompt(self) -> str:
+        """Fallback system prompt if YAML loading fails"""
         return """You are an expert resume analyzer and career consultant. 
 
 Your task is to analyze resume text and provide detailed, actionable feedback for improvement.
@@ -156,79 +187,70 @@ Format your response as structured analysis with clear sections and bullet point
         """Build the LangGraph workflow"""
         
         def analyze_resume_node(state: ResumeAnalysisState) -> ResumeAnalysisState:
-            """Main analysis node - sends resume text to Claude"""
+            """Main analysis node - sends resume text and optionally images to Claude"""
             try:
-                logger.info("Starting resume text analysis")
+                logger.info("Starting resume analysis")
                 
                 # Update status
                 state["processing_status"] = "analyzing"
+                state["image_processing_status"] = "processing"
                 
                 # Get resume text
                 resume_text = state.get("resume_text", "")
                 if not resume_text:
                     raise ResumeProcessingError("No resume text provided for analysis")
                 
-                # Create messages for Claude
-                messages = [
-                    SystemMessage(content=self.system_prompt),
-                    HumanMessage(content=f"""Please analyze this resume text and provide detailed improvement recommendations:
+                # Check if visual analysis is enabled
+                visual_analysis_enabled = state.get("visual_analysis_enabled", ENABLE_VISUAL_ANALYSIS_BY_DEFAULT)
+                pdf_data = state.get("pdf_data")
+                
+                # Prepare message content
+                if visual_analysis_enabled and pdf_data and "page_images" in pdf_data:
+                    logger.info("Preparing multi-modal analysis with page images")
+                    message_content = self._prepare_multimodal_content(resume_text, pdf_data)
+                    analysis_type = "multimodal"
+                else:
+                    logger.info("Preparing text-only analysis")
+                    message_content = f"""Please analyze this resume text and provide detailed improvement recommendations:
 
 RESUME TEXT:
 {resume_text}
 
-Please provide a comprehensive analysis with specific suggestions for improvement.""")
+Please provide a comprehensive analysis with specific suggestions for improvement."""
+                    analysis_type = "text_only"
+                
+                # Create messages for Claude
+                messages = [
+                    SystemMessage(content=self.system_prompt),
+                    HumanMessage(content=message_content)
                 ]
                 
                 # Get Claude's response with LangFuse tracking
-                logger.info(f"Sending {len(resume_text)} characters to Claude for analysis")
+                logger.info(f"Sending {analysis_type} content to Claude for analysis")
                 
                 # Create LangFuse handler for this specific request using PDF data for author
                 session_id = state.get("session_id", "unknown")
-                pdf_data = state.get("pdf_data")
                 langfuse_handler = create_langfuse_handler(session_id, pdf_data)
                 
                 # Create LLM with callbacks for this request
                 llm_with_callbacks = ChatAnthropic(
                     model=self.model_name,
                     temperature=0,
-                    max_tokens=4000,
+                    max_tokens=6000,  # Increased for visual analysis
                     callbacks=[langfuse_handler] if langfuse_handler else []
                 )
                 
                 response = llm_with_callbacks.invoke(messages)
                 
-                # Debug response object
-                logger.info(f"Claude response type: {type(response)}")
-                logger.info(f"Claude response attributes: {dir(response)}")
-                
-                # Safely extract content
-                if hasattr(response, 'content'):
-                    response_content = response.content
-                    logger.info(f"Response content type: {type(response_content)}")
-                    
-                    # Handle different content types
-                    if isinstance(response_content, str):
-                        analysis_text = response_content
-                    elif isinstance(response_content, list) and len(response_content) > 0:
-                        # If content is a list, try to extract text parts
-                        text_parts = []
-                        for part in response_content:
-                            if isinstance(part, dict) and 'text' in part:
-                                text_parts.append(part['text'])
-                            elif isinstance(part, str):
-                                text_parts.append(part)
-                        analysis_text = "\n".join(text_parts)
-                    else:
-                        analysis_text = str(response_content)
-                else:
-                    analysis_text = str(response)
-                
-                logger.info(f"Final analysis text length: {len(analysis_text)}")
+                # Extract response content
+                analysis_text = self._extract_response_content(response)
                 
                 # Store results
                 analysis_results = {
                     "analysis_text": analysis_text,
                     "model_used": self.model_name,
+                    "analysis_type": analysis_type,
+                    "visual_analysis_enabled": visual_analysis_enabled,
                     "input_length": len(resume_text),
                     "response_length": len(analysis_text),
                     "timestamp": str(datetime.datetime.now()),
@@ -239,13 +261,15 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                 state["messages"] = messages + [response]
                 state["analysis_results"] = analysis_results
                 state["processing_status"] = "complete"
+                state["image_processing_status"] = "complete"
                 
-                logger.info("Resume analysis completed successfully")
+                logger.info(f"Resume analysis completed successfully ({analysis_type})")
                 return state
                 
             except Exception as e:
                 logger.error(f"Resume analysis failed: {str(e)}")
                 state["processing_status"] = "error"
+                state["image_processing_status"] = "error"
                 state["error_message"] = str(e)
                 return state
         
@@ -273,6 +297,101 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
         )
         
         return builder.compile(checkpointer=self.memory)
+    
+    def _prepare_multimodal_content(self, resume_text: str, pdf_data: Dict) -> List:
+        """Prepare multi-modal content combining text and images for Claude"""
+        try:
+            page_images = pdf_data.get("page_images", [])
+            
+            # Limit number of images to send
+            images_to_send = page_images[:MAX_PAGE_IMAGES_FOR_ANALYSIS]
+            logger.info(f"Preparing {len(images_to_send)} page images for analysis")
+            
+            # Start with text content
+            content_parts = [
+                {
+                    "type": "text",
+                    "text": f"""Please analyze this resume comprehensively, including both content and visual presentation:
+
+RESUME TEXT:
+{resume_text}
+
+VISUAL ANALYSIS:
+I'm also providing page images of this resume. Please analyze the visual design, layout, typography, and overall professional presentation in addition to the content analysis.
+
+Please provide detailed recommendations for both content improvements and visual design enhancements."""
+                }
+            ]
+            
+            # Add images
+            for i, img_data in enumerate(images_to_send):
+                # Check image size
+                base64_data = img_data.get("base64", "")
+                if len(base64_data.encode()) > MAX_IMAGE_SIZE_BYTES:
+                    logger.warning(f"Image {i+1} too large, skipping")
+                    continue
+                
+                content_parts.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": base64_data
+                    }
+                })
+                
+                # Add context for each image
+                content_parts.append({
+                    "type": "text", 
+                    "text": f"Page {img_data.get('page_number', i+1)} of the resume above."
+                })
+            
+            logger.info(f"Prepared multi-modal content with {len([p for p in content_parts if p['type'] == 'image'])} images")
+            return content_parts
+            
+        except Exception as e:
+            logger.error(f"Failed to prepare multi-modal content: {e}")
+            # Fallback to text-only
+            return f"""Please analyze this resume text and provide detailed improvement recommendations:
+
+RESUME TEXT:
+{resume_text}
+
+Please provide a comprehensive analysis with specific suggestions for improvement."""
+    
+    def _extract_response_content(self, response) -> str:
+        """Extract text content from Claude response"""
+        try:
+            logger.info(f"Claude response type: {type(response)}")
+            
+            # Safely extract content
+            if hasattr(response, 'content'):
+                response_content = response.content
+                logger.info(f"Response content type: {type(response_content)}")
+                
+                # Handle different content types
+                if isinstance(response_content, str):
+                    analysis_text = response_content
+                elif isinstance(response_content, list) and len(response_content) > 0:
+                    # If content is a list, try to extract text parts
+                    text_parts = []
+                    for part in response_content:
+                        if isinstance(part, dict) and 'text' in part:
+                            text_parts.append(part['text'])
+                        elif isinstance(part, str):
+                            text_parts.append(part)
+                    analysis_text = "\n".join(text_parts)
+                else:
+                    analysis_text = str(response_content)
+            else:
+                analysis_text = str(response)
+            
+            logger.info(f"Final analysis text length: {len(analysis_text)}")
+            return analysis_text
+            
+        except Exception as e:
+            logger.error(f"Failed to extract response content: {e}")
+            return f"Error extracting response: {str(e)}"
     
     def analyze_resume_text(self, resume_text: str, session_id: str = None) -> Dict:
         """
@@ -302,7 +421,9 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                 "analysis_results": None,
                 "session_id": session_id,
                 "processing_status": "pending",
-                "error_message": None
+                "error_message": None,
+                "visual_analysis_enabled": False,  # Text-only analysis
+                "image_processing_status": None
             }
             
             # Run the analysis
@@ -399,7 +520,9 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                 "analysis_results": None,
                 "session_id": session_id,
                 "processing_status": "pending",
-                "error_message": None
+                "error_message": None,
+                "visual_analysis_enabled": ENABLE_VISUAL_ANALYSIS_BY_DEFAULT,  # Enable visual analysis with PDF data
+                "image_processing_status": "pending"
             }
             
             # Run the analysis

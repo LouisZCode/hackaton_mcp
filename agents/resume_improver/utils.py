@@ -12,6 +12,12 @@ MAX_FILE_SIZE_MB = 10
 SUPPORTED_FORMATS = ['.pdf']
 MAX_PAGES = 20
 
+# Image processing configuration for Claude analysis
+MAX_PAGE_IMAGES_FOR_ANALYSIS = 3  # Maximum page images to send to Claude
+IMAGE_DPI_FOR_ANALYSIS = 150  # DPI for page images sent to Claude
+MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024  # 5MB max per image for Claude
+ENABLE_VISUAL_ANALYSIS_BY_DEFAULT = True  # Whether to enable visual analysis by default
+
 def setup_logging():
     """Setup logging configuration"""
     logging.basicConfig(
