@@ -12,6 +12,8 @@ import logging
 from pdf_processor import PDFProcessor, process_pdf
 from utils import setup_logging, PDFProcessingError, PDFValidationError, format_file_size
 from agent_template import ResumeAnalyzerAgent
+import requests
+import base64
 
 # Setup logging
 logger = setup_logging()
@@ -26,110 +28,191 @@ class ResumeImproverApp:
         self.resume_analyzer = ResumeAnalyzerAgent()
         self.current_analysis = None
         
-    def upload_and_process_pdf(self, file) -> Tuple[str, str, str, List, List]:
+    def create_status_box(self, title: str, success: bool) -> str:
+        """Create HTML status box with checkmark or cross"""
+        if success:
+            return f"""
+            <div style="border: 2px solid #10B981; background: #D1FAE5; padding: 15px; 
+                        border-radius: 8px; text-align: center; margin: 5px; min-height: 80px;
+                        display: flex; flex-direction: column; justify-content: center;">
+                <h4 style="margin: 0 0 8px 0; color: #065F46; font-size: 14px;">{title}</h4>
+                <span style="font-size: 28px; color: #10B981;">✓</span>
+            </div>"""
+        else:
+            return f"""
+            <div style="border: 2px solid #EF4444; background: #FEE2E2; padding: 15px; 
+                        border-radius: 8px; text-align: center; margin: 5px; min-height: 80px;
+                        display: flex; flex-direction: column; justify-content: center;">
+                <h4 style="margin: 0 0 8px 0; color: #991B1B; font-size: 14px;">{title}</h4>
+                <span style="font-size: 28px; color: #EF4444;">✗</span>
+            </div>"""
+    
+    def validate_resume_content(self, text_content: str) -> bool:
+        """Use AI to validate if the text content is a resume"""
+        if not text_content or len(text_content.strip()) < 100:
+            return False
+            
+        try:
+            # Get Nebius API key
+            nebius_api_key = os.getenv("NEBIUS_API_KEY")
+            if not nebius_api_key:
+                logger.warning("NEBIUS_API_KEY not found, using text heuristics for resume validation")
+                # Fallback to keyword-based validation
+                resume_keywords = ['experience', 'education', 'skills', 'work', 'employment', 
+                                 'university', 'college', 'resume', 'cv', 'curriculum']
+                text_lower = text_content.lower()
+                keyword_count = sum(1 for keyword in resume_keywords if keyword in text_lower)
+                return keyword_count >= 3
+            
+            # Use Nebius AI for resume validation
+            headers = {
+                "Authorization": f"Bearer {nebius_api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            # Truncate text if too long for API
+            sample_text = text_content[:2000] if len(text_content) > 2000 else text_content
+            
+            payload = {
+                "model": "Qwen/Qwen2-VL-72B-Instruct",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"""Is this document a resume or CV? Answer only YES or NO.
+                        
+Document text:
+{sample_text}"""
+                    }
+                ],
+                "max_tokens": 10,
+                "temperature": 0
+            }
+            
+            response = requests.post(
+                "https://api.studio.nebius.com/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=15
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                answer = result["choices"][0]["message"]["content"].strip().upper()
+                logger.info(f"Resume validation result: {answer}")
+                return "YES" in answer
+            else:
+                logger.error(f"Resume validation API error: {response.status_code}")
+                # Fallback to keyword validation
+                resume_keywords = ['experience', 'education', 'skills', 'work', 'employment']
+                text_lower = text_content.lower()
+                keyword_count = sum(1 for keyword in resume_keywords if keyword in text_lower)
+                return keyword_count >= 2
+                
+        except Exception as e:
+            logger.error(f"Resume validation failed: {e}")
+            # Fallback validation
+            resume_keywords = ['experience', 'education', 'skills', 'work', 'employment']
+            text_lower = text_content.lower()
+            keyword_count = sum(1 for keyword in resume_keywords if keyword in text_lower)
+            return keyword_count >= 2
+        
+    def process_uploaded_file(self, file) -> Tuple[str, str, str, str]:
         """
-        Handle PDF upload and complete processing
+        Handle PDF upload with validation and status indicators
         
         Returns:
-            Tuple of (status_md, pdf_info_md, text_preview, page_images, embedded_images)
+            Tuple of (error_message, text_status_box, images_status_box, embedded_status_box)
         """
         try:
             if file is None:
                 return (
-                    "❌ **No file uploaded**", 
-                    "", 
-                    "", 
-                    [], 
-                    []
+                    "",
+                    self.create_status_box("Extracted Text", False),
+                    self.create_status_box("PDF Images", False),
+                    self.create_status_box("Embedded Images", False)
                 )
             
-            # Update status
-            status_md = "⏳ **Processing PDF...**"
+            # Check if file is PDF
+            if not file.name.lower().endswith('.pdf'):
+                error_msg = "❌ **Invalid document type.** Please upload a PDF file."
+                return (
+                    error_msg,
+                    self.create_status_box("Extracted Text", False),
+                    self.create_status_box("PDF Images", False),
+                    self.create_status_box("Embedded Images", False)
+                )
+            
+            logger.info(f"Processing uploaded PDF: {file.name}")
             
             # Process the PDF
-            logger.info(f"Processing uploaded PDF: {file.name}")
             self.current_pdf_data = process_pdf(file.name)
             
-            # Extract data for display
-            pdf_info = self.current_pdf_data['pdf_info']
+            # Extract data for validation
             text_data = self.current_pdf_data['text_data']
             page_images = self.current_pdf_data['page_images']
             embedded_images = self.current_pdf_data['embedded_images']
-            summary = self.current_pdf_data['processing_summary']
             
-            # Create status markdown
-            status_md = f"""
-## ✅ **PDF Processing Complete!**
-
-### 📊 **Processing Summary:**
-- **Pages Processed:** {summary['total_pages']}
-- **Text Extracted:** {summary['total_words']:,} words ({summary['total_text_length']:,} characters)
-- **Embedded Images:** {summary['embedded_images_count']} found
-- **Potential Headshots:** {summary['potential_headshots']} detected
-- **Status:** {'✅ Success' if summary['processing_success'] else '❌ Failed'}
-"""
+            # Validate extracted text
+            text_content = text_data.get('total_text', '')
+            has_text = bool(text_content and len(text_content.strip()) > 50)
             
-            # Create PDF info markdown
-            pdf_info_md = f"""
-## 📄 **PDF Information**
-
-| Property | Value |
-|----------|-------|
-| **Filename** | {pdf_info['filename']} |
-| **File Size** | {pdf_info['file_size_formatted']} |
-| **Pages** | {pdf_info['page_count']} |
-| **Title** | {pdf_info['title']} |
-| **Author** | {pdf_info['author']} |
-| **PDF Version** | {pdf_info['pdf_version']} |
-| **Encrypted** | {'Yes' if pdf_info['encrypted'] else 'No'} |
-| **Creation Date** | {pdf_info['creation_date']} |
-"""
+            # Validate if content is a resume
+            is_resume = False
+            if has_text:
+                is_resume = self.validate_resume_content(text_content)
             
-            # Create text preview (first 1000 characters)
-            text_preview = text_data['total_text'][:1000]
-            if len(text_data['total_text']) > 1000:
-                text_preview += "\n\n... (truncated)"
+            if not is_resume:
+                error_msg = "❌ **This PDF doesn't appear to be a resume.** Please upload a valid resume."
+                return (
+                    error_msg,
+                    self.create_status_box("Extracted Text", has_text),
+                    self.create_status_box("PDF Images", len(page_images) > 0),
+                    self.create_status_box("Embedded Images", len(embedded_images) > 0)
+                )
             
-            # Prepare page images for gallery - save to temp files with short names
-            page_image_list = []
-            for i, img in enumerate(page_images):
-                # Save to temp file with short name
-                temp_path = self._save_temp_image(img['base64'], f"page_{i+1}.png")
-                page_image_list.append((temp_path, f"Page {img['page_number']} ({img['width']}x{img['height']})"))
+            # All validations passed
+            has_page_images = len(page_images) > 0
+            has_embedded_images = len(embedded_images) > 0
             
-            # Prepare embedded images for gallery - save to temp files with short names  
-            embedded_image_list = []
-            for i, img in enumerate(embedded_images):
-                headshot_flag = "🖼️ Potential Headshot" if img['is_potential_headshot'] else "🖼️ Image"
-                caption = f"{headshot_flag} - Page {img['page_number']} ({img['width']}x{img['height']}, {img['format']})"
-                # Save to temp file with short name
-                temp_path = self._save_temp_image(img['base64'], f"img_{i+1}.{img['format'].lower()}")
-                embedded_image_list.append((temp_path, caption))
-            
-            logger.info(f"Successfully processed PDF: {pdf_info['filename']}")
+            logger.info(f"Successfully processed resume: {file.name}")
+            logger.info(f"Text: {has_text}, Images: {has_page_images}, Embedded: {has_embedded_images}")
             
             return (
-                status_md,
-                pdf_info_md, 
-                text_preview,
-                page_image_list,
-                embedded_image_list
+                "",  # No error
+                self.create_status_box("Extracted Text", has_text),
+                self.create_status_box("PDF Images", has_page_images),
+                self.create_status_box("Embedded Images", has_embedded_images)
             )
             
         except PDFValidationError as e:
-            error_msg = f"❌ **PDF Validation Failed**\n\n{str(e)}"
+            error_msg = f"❌ **PDF Validation Failed:** {str(e)}"
             logger.error(f"PDF validation failed: {str(e)}")
-            return (error_msg, "", "", [], [])
+            return (
+                error_msg,
+                self.create_status_box("Extracted Text", False),
+                self.create_status_box("PDF Images", False),
+                self.create_status_box("Embedded Images", False)
+            )
             
         except PDFProcessingError as e:
-            error_msg = f"❌ **PDF Processing Failed**\n\n{str(e)}"
+            error_msg = f"❌ **PDF Processing Failed:** {str(e)}"
             logger.error(f"PDF processing failed: {str(e)}")
-            return (error_msg, "", "", [], [])
+            return (
+                error_msg,
+                self.create_status_box("Extracted Text", False),
+                self.create_status_box("PDF Images", False),
+                self.create_status_box("Embedded Images", False)
+            )
             
         except Exception as e:
-            error_msg = f"❌ **Unexpected Error**\n\n{str(e)}"
+            error_msg = f"❌ **Processing Error:** {str(e)}"
             logger.error(f"Unexpected error: {str(e)}")
-            return (error_msg, "", "", [], [])
+            return (
+                error_msg,
+                self.create_status_box("Extracted Text", False),
+                self.create_status_box("PDF Images", False),
+                self.create_status_box("Embedded Images", False)
+            )
     
     def _save_temp_image(self, base64_data: str, filename: str) -> str:
         """Save base64 image to temp file with short path"""
@@ -154,7 +237,7 @@ class ResumeImproverApp:
     
     
     def get_image_analysis(self) -> str:
-        """Get detailed image analysis with face detection for the current PDF"""
+        """Get detailed image analysis with face detection for the current PDF using LangGraph workflow"""
         if not self.current_pdf_data:
             return "No PDF processed yet."
         
@@ -163,12 +246,23 @@ class ResumeImproverApp:
         if not embedded_images:
             return "## 🖼️ **Image Analysis**\n\n❌ **No embedded images found in resume**"
         
-        # Import face detection function
-        from utils import detect_face_in_embedded_images
+        # Import face detection agent
+        from utils import FaceDetectionAgent
         
-        # Run face detection
-        logger.info("Running face detection on embedded images")
-        face_detection_result = detect_face_in_embedded_images(embedded_images)
+        # Create session ID for face detection workflow
+        import uuid
+        session_id = f"face_detection_{uuid.uuid4().hex[:8]}"
+        
+        # Initialize face detection agent
+        face_agent = FaceDetectionAgent()
+        
+        # Run face detection workflow with LangFuse tracing
+        logger.info("Running face detection workflow with LangFuse tracing")
+        face_detection_result = face_agent.detect_faces_with_workflow(
+            embedded_images=embedded_images,
+            pdf_data=self.current_pdf_data,
+            session_id=session_id
+        )
         
         # Build analysis markdown
         analysis_md = "## 🖼️ **Image Analysis - Face Detection**\n\n"
@@ -187,9 +281,12 @@ class ResumeImproverApp:
 
 *This image can be enhanced for professional presentation.*
 
+**🔍 LangFuse Trace:** `profile_{session_id}` - Full workflow tracked for observability
+
 """
         else:
             analysis_md += f"### ❌ **{face_detection_result['message']}**\n\n"
+            analysis_md += f"**🔍 LangFuse Trace:** `profile_{session_id}` - Workflow completed with no face detected\n\n"
         
         # Show summary of all embedded images
         analysis_md += f"**Total Embedded Images Found**: {len(embedded_images)}\n\n"
@@ -358,134 +455,93 @@ Please check your internet connection and API configuration.
             return f.name
 
 def create_interface():
-    """Create the main Gradio interface"""
+    """Create the simplified Gradio interface"""
     
     app = ResumeImproverApp()
     
-    with gr.Blocks(title="Resume Improver - PDF Testing", theme=gr.themes.Soft()) as interface:
+    with gr.Blocks(title="Resume Improver - PDF AI processing", theme=gr.themes.Soft()) as interface:
         
-        gr.Markdown("""
-        # 🎯 Resume Improver - PDF Processing Test
-        
-        ## Phase 1: Foundation Testing
-        Upload a PDF resume to test our PyMuPDF processing pipeline.
-        
-        **What we test:**
-        - ✅ PDF upload and validation
-        - ✅ Text extraction (all content)  
-        - ✅ Page image conversion
-        - ✅ Embedded image extraction
-        - ✅ Headshot detection algorithm
-        """)
+        # Simple, clean header
+        gr.Markdown("# Resume Improver - PDF AI processing")
         
         with gr.Row():
             with gr.Column(scale=1):
-                # Upload Section
-                gr.Markdown("## 📤 **Step 1: Upload PDF Resume**")
-                
+                # Direct upload without steps
                 pdf_file = gr.File(
-                    label="Choose PDF Resume",
+                    label="Upload PDF Resume",
                     file_types=[".pdf"],
                     type="filepath"
                 )
                 
-                process_btn = gr.Button(
-                    "🔄 Process PDF", 
-                    variant="primary",
-                    size="lg"
-                )
-                
-                # Status Display
-                status_display = gr.Markdown(
-                    "⏳ **Waiting for PDF upload...**",
-                    label="Processing Status"
-                )
+                # Error/status message area
+                error_display = gr.Markdown(value="", visible=True)
             
             with gr.Column(scale=2):
-                # PDF Info Section
-                gr.Markdown("## 📊 **Step 2: PDF Information**")
-                
-                pdf_info_display = gr.Markdown(
-                    "Upload a PDF to see file information...",
-                    label="PDF Details"
-                )
+                # Status indicator boxes
+                with gr.Row():
+                    text_status = gr.HTML(
+                        value=app.create_status_box("Extracted Text", False),
+                        label="Text Status"
+                    )
+                    images_status = gr.HTML(
+                        value=app.create_status_box("PDF Images", False),
+                        label="Images Status"
+                    )
+                    embedded_status = gr.HTML(
+                        value=app.create_status_box("Embedded Images", False),
+                        label="Embedded Status"
+                    )
         
-        # Results Section
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("## 📝 **Step 3: Extracted Text Preview**")
-                text_preview = gr.Textbox(
-                    label="Text Content (First 1000 characters)",
-                    lines=10,
-                    max_lines=15,
-                    interactive=False
-                )
-        
-        # Images Section
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("## 📄 **Step 4: PDF Page Images**")
-                page_images_gallery = gr.Gallery(
-                    label="Page Images",
-                    show_label=True,
-                    elem_id="page_images",
-                    columns=2,
-                    rows=2,
-                    height="auto"
-                )
-            
-            with gr.Column():
-                gr.Markdown("## 🖼️ **Step 5: Embedded Images**")
-                embedded_images_gallery = gr.Gallery(
-                    label="Extracted Images (Potential Headshots)",
-                    show_label=True,
-                    elem_id="embedded_images",
-                    columns=2,
-                    rows=2,
-                    height="auto"
-                )
-        
-        # Analysis Tabs
-        with gr.Tabs():
+        # Analysis Tabs (only show when processing is successful)
+        with gr.Tabs(visible=False) as analysis_tabs:
             with gr.TabItem("🎯 Experience Analysis"):
-                gr.Markdown("### 🤖 **AI-Powered Resume Analysis**")
-                gr.Markdown("Get detailed improvement recommendations from Claude AI")
-                
                 claude_analysis_btn = gr.Button(
                     "🚀 Analyze Resume with Claude", 
                     variant="primary",
                     size="lg"
                 )
                 claude_analysis_display = gr.Markdown(
-                    "Click the button above to start AI analysis...",
+                    "Ready for AI analysis...",
                     label="Experience Analysis Results"
                 )
             
             with gr.TabItem("🖼️ Image Analysis"):
-                image_analysis_btn = gr.Button("🔍 Get Detailed Image Analysis")
+                image_analysis_btn = gr.Button("🔍 Get Face Detection Analysis")
                 image_analysis_display = gr.Markdown()
             
-            with gr.TabItem("📋 Analysis Summary"):
-                summary_btn = gr.Button("📋 Get Analysis Summary")
-                summary_display = gr.Markdown()
-            
-            with gr.TabItem("💾 Export Data"):
+            with gr.TabItem("📥 Export Data"):
                 export_btn = gr.Button("📥 Export Processing Data (JSON)")
                 export_file = gr.File(label="Download Processing Data")
         
-        # Event Handlers
-        process_btn.click(
-            fn=app.upload_and_process_pdf,
+        def handle_file_upload(file):
+            """Handle file upload with automatic processing"""
+            error_msg, text_box, images_box, embedded_box = app.process_uploaded_file(file)
+            
+            # Show analysis tabs only if processing was successful (no error)
+            show_tabs = (error_msg == "")
+            
+            return [
+                error_msg,  # error_display
+                text_box,   # text_status
+                images_box, # images_status
+                embedded_box, # embedded_status
+                gr.update(visible=show_tabs)  # analysis_tabs
+            ]
+        
+        # Auto-process on file upload
+        pdf_file.change(
+            fn=handle_file_upload,
             inputs=[pdf_file],
             outputs=[
-                status_display,
-                pdf_info_display,
-                text_preview,
-                page_images_gallery,
-                embedded_images_gallery
+                error_display,
+                text_status,
+                images_status,
+                embedded_status,
+                analysis_tabs
             ]
         )
         
+        # Analysis event handlers
         claude_analysis_btn.click(
             fn=app.analyze_resume_with_claude,
             outputs=[claude_analysis_display]
@@ -496,32 +552,10 @@ def create_interface():
             outputs=[image_analysis_display]
         )
         
-        summary_btn.click(
-            fn=app.get_analysis_summary,
-            outputs=[summary_display]
-        )
-        
         export_btn.click(
             fn=app.export_processing_data,
             outputs=[export_file]
         )
-        
-        # Footer
-        gr.Markdown("""
-        ---
-        ### 🛠️ **Development Notes:**
-        - **PDF Processing:** PyMuPDF for text, images, and metadata extraction
-        - **AI Analysis:** Claude 3.7 Sonnet via LangGraph for expert resume feedback
-        - **Observability:** LangFuse integration for tracking and monitoring
-        - **Phase 2:** AI-powered resume analysis now available! 🚀
-        """)
-        
-        gr.Markdown("""
-        ### 🎯 **Workflow:**
-        1. **Upload PDF** → Extract text and images
-        2. **Claude Analysis** → Get AI-powered improvement recommendations  
-        3. **Export Results** → Download complete analysis and suggestions
-        """)
     
     return interface
 
