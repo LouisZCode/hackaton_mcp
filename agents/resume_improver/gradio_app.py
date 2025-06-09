@@ -154,25 +154,53 @@ class ResumeImproverApp:
     
     
     def get_image_analysis(self) -> str:
-        """Get detailed image analysis for the current PDF"""
+        """Get detailed image analysis with face detection for the current PDF"""
         if not self.current_pdf_data:
             return "No PDF processed yet."
         
         embedded_images = self.current_pdf_data['embedded_images']
         
         if not embedded_images:
-            return "## 🖼️ **No embedded images found**"
+            return "## 🖼️ **Image Analysis**\n\n❌ **No embedded images found in resume**"
         
-        analysis_md = "## 🖼️ **Image Analysis**\n\n"
+        # Import face detection function
+        from utils import detect_face_in_embedded_images
+        
+        # Run face detection
+        logger.info("Running face detection on embedded images")
+        face_detection_result = detect_face_in_embedded_images(embedded_images)
+        
+        # Build analysis markdown
+        analysis_md = "## 🖼️ **Image Analysis - Face Detection**\n\n"
+        
+        if face_detection_result["face_found"]:
+            analysis_md += f"### ✅ **{face_detection_result['message']}**\n\n"
+            
+            face_img = face_detection_result["face_image"]
+            analysis_md += f"""
+**Detected Profile Picture Details:**
+- **Image:** {face_img['image_index'] + 1} (Page {face_img['page_number']})
+- **Dimensions:** {face_img['width']} × {face_img['height']} pixels
+- **Format:** {face_img['format']}
+- **Size:** {format_file_size(face_img['size_bytes'])}
+- **Aspect Ratio:** {face_img['aspect_ratio']:.2f}
+
+*This image can be enhanced for professional presentation.*
+
+"""
+        else:
+            analysis_md += f"### ❌ **{face_detection_result['message']}**\n\n"
+        
+        # Show summary of all embedded images
+        analysis_md += f"**Total Embedded Images Found**: {len(embedded_images)}\n\n"
         
         for img in embedded_images:
             analysis_md += f"""
-### Image {img['image_index'] + 1} (Page {img['page_number']})
+**Image {img['image_index'] + 1}** (Page {img['page_number']}):
 - **Dimensions:** {img['width']} × {img['height']} pixels
-- **Format:** {img['format']}
+- **Format:** {img['format']} 
 - **Size:** {format_file_size(img['size_bytes'])}
 - **Aspect Ratio:** {img['aspect_ratio']:.2f}
-- **Potential Headshot:** {'✅ Yes' if img['is_potential_headshot'] else '❌ No'}
 
 """
         

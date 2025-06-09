@@ -4,7 +4,9 @@ Utility functions for resume improver system
 
 import os
 import logging
-from typing import Optional, Tuple, List
+import base64
+import requests
+from typing import Optional, Tuple, List, Dict
 from pathlib import Path
 
 # Configuration constants
@@ -93,3 +95,102 @@ class PDFValidationError(ResumeProcessingError):
 class PDFProcessingError(ResumeProcessingError):
     """Exception for PDF processing errors"""
     pass
+
+# Face detection utilities
+def detect_face_in_embedded_images(embedded_images: List[Dict]) -> Dict:
+    """
+    Detect faces in embedded images using Nebius LlaVA
+    
+    Args:
+        embedded_images: List of embedded image dictionaries with base64 data
+        
+    Returns:
+        Dictionary with detection results
+    """
+    logger = setup_logging()
+    
+    if not embedded_images:
+        return {
+            "face_found": False,
+            "message": "No embedded images found in resume",
+            "face_image": None
+        }
+    
+    # Get Nebius API key
+    nebius_api_key = os.getenv("NEBIUS_API_KEY")
+    if not nebius_api_key:
+        logger.error("NEBIUS_API_KEY not found in environment variables")
+        return {
+            "face_found": False,
+            "message": "Face detection service not configured",
+            "face_image": None
+        }
+    
+    # Check each embedded image for faces
+    for img in embedded_images:
+        try:
+            logger.info(f"Checking image {img.get('page_number', 'unknown')} for faces")
+            
+            # Prepare the API request
+            headers = {
+                "Authorization": f"Bearer {nebius_api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            # Create the message content for Qwen-VL
+            payload = {
+                "model": "Qwen/Qwen2-VL-72B-Instruct",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Does this image contain a human face? Answer only YES or NO."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{img['base64']}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "max_tokens": 10,
+                "temperature": 0
+            }
+            
+            # Make API request to Nebius
+            response = requests.post(
+                "https://api.studio.nebius.com/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                answer = result["choices"][0]["message"]["content"].strip().upper()
+                
+                logger.info(f"Face detection result for image {img.get('page_number', 'unknown')}: {answer}")
+                
+                if "YES" in answer:
+                    return {
+                        "face_found": True,
+                        "message": "Profile picture detected - Ready for enhancement",
+                        "face_image": img
+                    }
+            else:
+                logger.error(f"Nebius API error: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error checking image for faces: {e}")
+            continue
+    
+    # No faces found in any image
+    return {
+        "face_found": False,
+        "message": "No profile picture found in embedded images",
+        "face_image": None
+    }

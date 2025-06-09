@@ -228,22 +228,20 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                 # Get Claude's response with LangFuse tracking
                 logger.info(f"Sending {analysis_type} content to Claude for analysis")
                 
-                # Create LangFuse handler for this specific request using PDF data for author
-                session_id = state.get("session_id", "unknown")
-                langfuse_handler = create_langfuse_handler(session_id, pdf_data)
-                
-                # Create LLM with callbacks for this request
-                llm_with_callbacks = ChatAnthropic(
+                # Create LLM instance (tracing handled at graph level)
+                llm = ChatAnthropic(
                     model=self.model_name,
                     temperature=0,
                     max_tokens=6000,  # Increased for visual analysis
-                    callbacks=[langfuse_handler] if langfuse_handler else []
                 )
                 
-                response = llm_with_callbacks.invoke(messages)
+                response = llm.invoke(messages)
                 
                 # Extract response content
                 analysis_text = self._extract_response_content(response)
+                
+                # Get session ID from state
+                session_id = state.get("session_id", "unknown")
                 
                 # Store results
                 analysis_results = {
@@ -254,7 +252,8 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                     "input_length": len(resume_text),
                     "response_length": len(analysis_text),
                     "timestamp": str(datetime.datetime.now()),
-                    "langfuse_session": session_id
+                    "langfuse_session": session_id,
+                    "trace_name": create_personalized_trace_name(pdf_data) if pdf_data else "resume_unknown"
                 }
                 
                 # Update state
@@ -297,6 +296,27 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
         )
         
         return builder.compile(checkpointer=self.memory)
+    
+    def _create_graph_with_tracing(self, session_id: str, pdf_data: Dict = None):
+        """Create graph instance with LangFuse tracing"""
+        # Create LangFuse handler for workflow-level tracing
+        langfuse_handler = create_langfuse_handler(session_id, pdf_data)
+        
+        if langfuse_handler:
+            # Compile graph with LangFuse callbacks
+            graph_with_tracing = self.graph.with_config({
+                "callbacks": [langfuse_handler],
+                "metadata": {
+                    "session_id": session_id,
+                    "trace_name": create_personalized_trace_name(pdf_data) if pdf_data else "resume_unknown",
+                    "workflow_type": "resume_analysis"
+                }
+            })
+            logger.info(f"Graph compiled with LangFuse tracing for session: {session_id}")
+            return graph_with_tracing
+        else:
+            logger.warning("LangFuse handler not available, using graph without tracing")
+            return self.graph
     
     def _prepare_multimodal_content(self, resume_text: str, pdf_data: Dict) -> List:
         """Prepare multi-modal content combining text and images for Claude"""
@@ -426,9 +446,12 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                 "image_processing_status": None
             }
             
+            # Create graph with workflow-level tracing
+            graph_with_tracing = self._create_graph_with_tracing(session_id, None)
+            
             # Run the analysis
             logger.info(f"Starting resume analysis for session: {session_id}")
-            final_state = self.graph.invoke(
+            final_state = graph_with_tracing.invoke(
                 initial_state,
                 config={"configurable": {"thread_id": session_id}}
             )
@@ -440,6 +463,8 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                     "analysis": final_state["analysis_results"]["analysis_text"],
                     "metadata": {
                         "model_used": final_state["analysis_results"]["model_used"],
+                        "analysis_type": final_state["analysis_results"].get("analysis_type", "text_only"),
+                        "visual_analysis_enabled": final_state["analysis_results"].get("visual_analysis_enabled", False),
                         "input_length": final_state["analysis_results"]["input_length"],
                         "response_length": final_state["analysis_results"]["response_length"],
                         "session_id": session_id
@@ -508,10 +533,6 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                 import uuid
                 session_id = f"resume_{uuid.uuid4().hex[:8]}"
             
-            # Create LangFuse handler using PDF data for author extraction
-            langfuse_handler = create_langfuse_handler(session_id, pdf_data)
-            logger.info(f"Created LangFuse handler for session: {session_id}")
-            
             # Initial state
             initial_state = {
                 "messages": [],
@@ -525,9 +546,12 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                 "image_processing_status": "pending"
             }
             
+            # Create graph with workflow-level tracing
+            graph_with_tracing = self._create_graph_with_tracing(session_id, pdf_data)
+            
             # Run the analysis
             logger.info(f"Starting resume analysis for session: {session_id}")
-            final_state = self.graph.invoke(
+            final_state = graph_with_tracing.invoke(
                 initial_state,
                 config={"configurable": {"thread_id": session_id}}
             )
@@ -539,6 +563,8 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                     "analysis": final_state["analysis_results"]["analysis_text"],
                     "metadata": {
                         "model_used": final_state["analysis_results"]["model_used"],
+                        "analysis_type": final_state["analysis_results"].get("analysis_type", "text_only"),
+                        "visual_analysis_enabled": final_state["analysis_results"].get("visual_analysis_enabled", False),
                         "input_length": final_state["analysis_results"]["input_length"],
                         "response_length": final_state["analysis_results"]["response_length"],
                         "session_id": session_id

@@ -5,7 +5,9 @@
       "Bash(mkdir:*)",
       "Bash(cp:*)",
       "Bash(mv:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "WebFetch(domain:docs.nebius.com)",
+      "WebFetch(domain:studio.nebius.ai)"
     ],
     "deny": []
   }
