@@ -636,7 +636,15 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
             
             # Create multi-modal content if images available
             if page_images and ENABLE_VISUAL_ANALYSIS_BY_DEFAULT:
-                content = self._prepare_multimodal_content(resume_text, page_images, prompt_content)
+                # Use existing multimodal content preparation
+                multimodal_content = self._prepare_multimodal_content(resume_text, pdf_data)
+                # Replace the hardcoded prompt with our custom prompt
+                if isinstance(multimodal_content, list) and len(multimodal_content) > 0:
+                    # Update the first text part with our custom prompt
+                    multimodal_content[0]["text"] = f"{prompt_content}\n\nRESUME TEXT:\n{resume_text}\n\nVISUAL ANALYSIS:\nI'm also providing page images of this resume. Please analyze the visual design, layout, typography, and overall professional presentation in addition to the content analysis."
+                    content = multimodal_content
+                else:
+                    content = f"{prompt_content}\n\nRESUME TEXT:\n{resume_text}"
                 analysis_type = "multimodal"
             else:
                 content = f"{prompt_content}\n\nRESUME TEXT:\n{resume_text}"
@@ -648,9 +656,11 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
             # Create the message
             message = HumanMessage(content=content)
             
-            # Invoke Claude with tracing
-            with langfuse_handler:
-                response = self.llm.invoke([message])
+            # Invoke Claude with tracing (using callback configuration)
+            response = self.llm.invoke(
+                [message],
+                config={"callbacks": [langfuse_handler]} if langfuse_handler else {}
+            )
             
             # Extract response text
             analysis_text = self._extract_response_content(response)
@@ -660,7 +670,7 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                 "success": True,
                 "analysis": analysis_text,
                 "metadata": {
-                    "model_used": self.llm.model_name,
+                    "model_used": self.model_name,
                     "analysis_type": analysis_type,
                     "prompt_key": prompt_key,
                     "visual_analysis_enabled": analysis_type == "multimodal",
@@ -742,7 +752,15 @@ Based on the analysis above, please provide optimized resume content following t
             
             # Add images if available
             if page_images and ENABLE_VISUAL_ANALYSIS_BY_DEFAULT:
-                content = self._prepare_multimodal_content(resume_text, page_images, optimization_content)
+                # Use existing multimodal content preparation
+                multimodal_content = self._prepare_multimodal_content(resume_text, pdf_data)
+                # Replace the hardcoded prompt with our optimization content
+                if isinstance(multimodal_content, list) and len(multimodal_content) > 0:
+                    # Update the first text part with our optimization prompt
+                    multimodal_content[0]["text"] = optimization_content
+                    content = multimodal_content
+                else:
+                    content = optimization_content
                 analysis_type = "multimodal"
             else:
                 content = optimization_content
@@ -754,9 +772,11 @@ Based on the analysis above, please provide optimized resume content following t
             # Create the message
             message = HumanMessage(content=content)
             
-            # Invoke Claude with tracing
-            with langfuse_handler:
-                response = self.llm.invoke([message])
+            # Invoke Claude with tracing (using callback configuration)
+            response = self.llm.invoke(
+                [message],
+                config={"callbacks": [langfuse_handler]} if langfuse_handler else {}
+            )
             
             # Extract response text
             optimization_text = self._extract_response_content(response)
@@ -766,7 +786,7 @@ Based on the analysis above, please provide optimized resume content following t
                 "success": True,
                 "analysis": optimization_text,  # Using 'analysis' key for consistency
                 "metadata": {
-                    "model_used": self.llm.model_name,
+                    "model_used": self.model_name,
                     "analysis_type": analysis_type,
                     "prompt_key": prompt_key,
                     "visual_analysis_enabled": analysis_type == "multimodal",
