@@ -584,6 +584,241 @@ Please provide a comprehensive analysis with specific suggestions for improvemen
                 "error": str(e),
                 "session_id": session_id
             }
+    
+    def analyze_resume_with_prompt(self, pdf_data: Dict, prompt_key: str, session_id: str = None) -> Dict:
+        """
+        Analyze resume using a specific prompt from prompts.yaml
+        
+        Args:
+            pdf_data: Complete PDF processing results
+            prompt_key: Key of the prompt to use (e.g., 'resume_analysis_prompt')
+            session_id: Optional session ID
+            
+        Returns:
+            Analysis results dictionary
+        """
+        try:
+            if not session_id:
+                import uuid
+                session_id = f"prompt_analysis_{uuid.uuid4().hex[:8]}"
+            
+            # Extract author name for personalized tracing
+            author_name = extract_name_from_pdf_author(pdf_data)
+            
+            # Create specialized trace name based on prompt type
+            if prompt_key == "resume_analysis_prompt":
+                trace_name = f"resume_analysis_{author_name}"
+            elif prompt_key == "resume_optimization_prompt":
+                trace_name = f"resume_optimization_{author_name}"
+            else:
+                trace_name = f"resume_{prompt_key}_{author_name}"
+            
+            # Create LangFuse handler with specialized trace name
+            langfuse_handler = CallbackHandler(
+                session_id=session_id,
+                user_id="resume_user",
+                trace_name=trace_name
+            )
+            logger.info(f"Created specialized LangFuse handler - Session: {session_id}, Trace: {trace_name}")
+            
+            # Load the specific prompt
+            prompt_content = self._load_prompt(prompt_key)
+            if not prompt_content:
+                return {
+                    "success": False,
+                    "error": f"Prompt '{prompt_key}' not found in prompts.yaml",
+                    "session_id": session_id
+                }
+            
+            # Prepare content for analysis
+            resume_text = pdf_data["text_data"]["total_text"]
+            page_images = pdf_data.get("page_images", [])
+            
+            # Create multi-modal content if images available
+            if page_images and ENABLE_VISUAL_ANALYSIS_BY_DEFAULT:
+                content = self._prepare_multimodal_content(resume_text, page_images, prompt_content)
+                analysis_type = "multimodal"
+            else:
+                content = f"{prompt_content}\n\nRESUME TEXT:\n{resume_text}"
+                analysis_type = "text_only"
+            
+            # Run analysis with LangFuse tracing
+            logger.info(f"Running {analysis_type} analysis with prompt: {prompt_key}")
+            
+            # Create the message
+            message = HumanMessage(content=content)
+            
+            # Invoke Claude with tracing
+            with langfuse_handler:
+                response = self.llm.invoke([message])
+            
+            # Extract response text
+            analysis_text = self._extract_response_content(response)
+            
+            # Prepare results
+            results = {
+                "success": True,
+                "analysis": analysis_text,
+                "metadata": {
+                    "model_used": self.llm.model_name,
+                    "analysis_type": analysis_type,
+                    "prompt_key": prompt_key,
+                    "visual_analysis_enabled": analysis_type == "multimodal",
+                    "input_length": len(resume_text),
+                    "response_length": len(analysis_text),
+                    "session_id": session_id,
+                    "trace_name": trace_name,
+                    "author_name": author_name,
+                    "timestamp": str(datetime.datetime.now())
+                }
+            }
+            
+            logger.info(f"Prompt-based analysis completed successfully for session: {session_id}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Prompt-based analysis failed: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "session_id": session_id
+            }
+    
+    def optimize_resume_with_prompt(self, pdf_data: Dict, previous_analysis: str, prompt_key: str, session_id: str = None) -> Dict:
+        """
+        Optimize resume content using optimization prompt and previous analysis
+        
+        Args:
+            pdf_data: Complete PDF processing results
+            previous_analysis: Results from the analysis step
+            prompt_key: Key of the optimization prompt to use
+            session_id: Optional session ID
+            
+        Returns:
+            Optimization results dictionary
+        """
+        try:
+            if not session_id:
+                import uuid
+                session_id = f"prompt_optimization_{uuid.uuid4().hex[:8]}"
+            
+            # Extract author name for personalized tracing
+            author_name = extract_name_from_pdf_author(pdf_data)
+            
+            # Create specialized trace name for optimization
+            trace_name = f"resume_optimization_{author_name}"
+            
+            # Create LangFuse handler with specialized trace name
+            langfuse_handler = CallbackHandler(
+                session_id=session_id,
+                user_id="resume_user",
+                trace_name=trace_name
+            )
+            logger.info(f"Created optimization LangFuse handler - Session: {session_id}, Trace: {trace_name}")
+            
+            # Load the optimization prompt
+            prompt_content = self._load_prompt(prompt_key)
+            if not prompt_content:
+                return {
+                    "success": False,
+                    "error": f"Optimization prompt '{prompt_key}' not found in prompts.yaml",
+                    "session_id": session_id
+                }
+            
+            # Prepare content for optimization
+            resume_text = pdf_data["text_data"]["total_text"]
+            page_images = pdf_data.get("page_images", [])
+            
+            # Create comprehensive optimization prompt
+            optimization_content = f"""{prompt_content}
+
+PREVIOUS ANALYSIS RESULTS:
+{previous_analysis}
+
+ORIGINAL RESUME CONTENT:
+{resume_text}
+
+Based on the analysis above, please provide optimized resume content following the guidelines in the prompt."""
+            
+            # Add images if available
+            if page_images and ENABLE_VISUAL_ANALYSIS_BY_DEFAULT:
+                content = self._prepare_multimodal_content(resume_text, page_images, optimization_content)
+                analysis_type = "multimodal"
+            else:
+                content = optimization_content
+                analysis_type = "text_only"
+            
+            # Run optimization with LangFuse tracing
+            logger.info(f"Running {analysis_type} optimization with prompt: {prompt_key}")
+            
+            # Create the message
+            message = HumanMessage(content=content)
+            
+            # Invoke Claude with tracing
+            with langfuse_handler:
+                response = self.llm.invoke([message])
+            
+            # Extract response text
+            optimization_text = self._extract_response_content(response)
+            
+            # Prepare results
+            results = {
+                "success": True,
+                "analysis": optimization_text,  # Using 'analysis' key for consistency
+                "metadata": {
+                    "model_used": self.llm.model_name,
+                    "analysis_type": analysis_type,
+                    "prompt_key": prompt_key,
+                    "visual_analysis_enabled": analysis_type == "multimodal",
+                    "input_length": len(resume_text),
+                    "response_length": len(optimization_text),
+                    "session_id": session_id,
+                    "trace_name": trace_name,
+                    "author_name": author_name,
+                    "timestamp": str(datetime.datetime.now()),
+                    "based_on_analysis": True
+                }
+            }
+            
+            logger.info(f"Prompt-based optimization completed successfully for session: {session_id}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Prompt-based optimization failed: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "session_id": session_id
+            }
+    
+    def _load_prompt(self, prompt_key: str) -> str:
+        """Load a specific prompt from prompts.yaml"""
+        try:
+            import yaml
+            from pathlib import Path
+            
+            # Get the directory where this script is located
+            current_dir = Path(__file__).parent
+            prompts_file = current_dir / "prompts.yaml"
+            
+            if not prompts_file.exists():
+                logger.error(f"Prompts file not found: {prompts_file}")
+                return None
+            
+            with open(prompts_file, 'r', encoding='utf-8') as f:
+                prompts_data = yaml.safe_load(f)
+            
+            prompt_content = prompts_data.get(prompt_key)
+            if not prompt_content:
+                logger.error(f"Prompt key '{prompt_key}' not found in prompts.yaml")
+                return None
+            
+            logger.info(f"Successfully loaded prompt: {prompt_key}")
+            return prompt_content
+            
+        except Exception as e:
+            logger.error(f"Failed to load prompt '{prompt_key}': {e}")
+            return None
 
 # Convenience function for simple usage
 def analyze_resume(text: str, session_id: str = None) -> Dict:

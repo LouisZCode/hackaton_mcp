@@ -23,3 +23,6 @@ langfuse>=2.0.0
 
 # System utilities
 IPython>=8.0.0
+
+# Image enhancement with Flux Kontext
+requests>=2.31.0

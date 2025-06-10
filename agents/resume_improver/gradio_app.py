@@ -303,8 +303,518 @@ Document text:
         
         return analysis_md
     
+    def analyze_resume_strengths_weaknesses(self) -> Tuple[str, gr.Button, gr.Button]:
+        """Step 1: Analyze resume for strengths, weaknesses, and recruiter insights"""
+        if not self.current_pdf_data:
+            return (
+                "❌ **No PDF processed yet.** Please upload a resume first.",
+                gr.update(),  # Keep analyze button as is
+                gr.update(visible=False)  # Keep optimize button hidden
+            )
+        
+        try:
+            # Generate session ID for this analysis
+            import uuid
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            session_id = f"analysis_{timestamp}_{uuid.uuid4().hex[:6]}"
+            
+            logger.info(f"Starting Step 1 - Resume Analysis for session: {session_id}")
+            
+            # Run the analysis using the analysis prompt
+            result = self.resume_analyzer.analyze_resume_with_prompt(
+                self.current_pdf_data, 
+                prompt_key="resume_analysis_prompt",
+                session_id=session_id
+            )
+            
+            if result["success"]:
+                # Store the analysis for Step 2
+                self.current_analysis = result
+                
+                # Format the analysis for display
+                metadata = result['metadata']
+                analysis_type_icon = "🎨 **Multi-Modal Analysis**" if metadata.get('analysis_type') == "multimodal" else "📝 **Text-Only Analysis**"
+                
+                analysis_md = f"""
+# 🔍 **Resume Analysis Report**
+
+## 📊 **Analysis Metadata**
+- **Type:** {analysis_type_icon}
+- **Model:** {metadata['model_used']}
+- **Session ID:** `{metadata['session_id']}`
+- **LangFuse Trace:** `resume_analysis_{metadata.get('author_name', 'unknown')}`
+
+---
+
+{result['analysis']}
+
+---
+
+*✅ Analysis complete! Click "Create better Resume experience copy" to get optimized content.*
+"""
+                
+                logger.info(f"Step 1 analysis completed successfully for session: {session_id}")
+                return (
+                    analysis_md,
+                    gr.update(visible=False),  # Hide analyze button
+                    gr.update(visible=True)    # Show optimize button
+                )
+                
+            else:
+                error_msg = f"""
+# ❌ **Analysis Failed**
+
+**Error:** {result['error']}
+**Session ID:** {result.get('session_id', 'unknown')}
+
+Please try again or check your API configuration.
+"""
+                logger.error(f"Step 1 analysis failed: {result['error']}")
+                return (
+                    error_msg,
+                    gr.update(),  # Keep analyze button as is
+                    gr.update(visible=False)  # Keep optimize button hidden
+                )
+                
+        except Exception as e:
+            error_msg = f"""
+# ❌ **Analysis Error**
+
+**Unexpected Error:** {str(e)}
+
+Please check your internet connection and API configuration.
+"""
+            logger.error(f"Step 1 analysis error: {str(e)}")
+            return (
+                error_msg,
+                gr.update(),  # Keep analyze button as is
+                gr.update(visible=False)  # Keep optimize button hidden
+            )
+    
+    def create_optimized_experience_copy(self) -> str:
+        """Step 2: Create optimized resume content based on previous analysis"""
+        if not self.current_analysis:
+            return "❌ **No analysis available.** Please run 'Analyze with AI' first."
+        
+        try:
+            # Generate session ID for this optimization
+            import uuid
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            session_id = f"optimization_{timestamp}_{uuid.uuid4().hex[:6]}"
+            
+            logger.info(f"Starting Step 2 - Resume Optimization for session: {session_id}")
+            
+            # Run the optimization using the optimization prompt
+            result = self.resume_analyzer.optimize_resume_with_prompt(
+                self.current_pdf_data,
+                previous_analysis=self.current_analysis['analysis'], 
+                prompt_key="resume_optimization_prompt",
+                session_id=session_id
+            )
+            
+            if result["success"]:
+                # Format the optimization for display
+                metadata = result['metadata']
+                
+                optimization_md = f"""
+# ✨ **Optimized Resume Content**
+
+## 📊 **Optimization Metadata**
+- **Model:** {metadata['model_used']}
+- **Session ID:** `{metadata['session_id']}`
+- **LangFuse Trace:** `resume_optimization_{metadata.get('author_name', 'unknown')}`
+- **Based on Analysis:** {self.current_analysis['metadata']['session_id']}
+
+---
+
+{result['analysis']}
+
+---
+
+*🎯 Copy the optimized content above and update your resume with these improvements!*
+"""
+                
+                logger.info(f"Step 2 optimization completed successfully for session: {session_id}")
+                return optimization_md
+                
+            else:
+                error_msg = f"""
+# ❌ **Optimization Failed**
+
+**Error:** {result['error']}
+**Session ID:** {result.get('session_id', 'unknown')}
+
+Please try again or check your API configuration.
+"""
+                logger.error(f"Step 2 optimization failed: {result['error']}")
+                return error_msg
+                
+        except Exception as e:
+            error_msg = f"""
+# ❌ **Optimization Error**
+
+**Unexpected Error:** {str(e)}
+
+Please check your internet connection and API configuration.
+"""
+            logger.error(f"Step 2 optimization error: {str(e)}")
+            return error_msg
+    
+    def detect_face_progressive(self) -> Tuple[str, gr.Image, gr.Button, gr.Button]:
+        """Step 1: Face detection with progressive UI disclosure"""
+        if not self.current_pdf_data:
+            return (
+                "❌ **No PDF processed yet.** Please upload a resume first.",
+                gr.update(visible=False),  # Hide detected image
+                gr.update(),  # Keep detect button as is
+                gr.update(visible=False)  # Keep enhance button hidden
+            )
+        
+        embedded_images = self.current_pdf_data['embedded_images']
+        
+        if not embedded_images:
+            return (
+                "❌ **No embedded images found in resume**",
+                gr.update(visible=False),  # Hide detected image
+                gr.update(visible=True),   # Keep detect button visible for retry
+                gr.update(visible=False)  # Keep enhance button hidden
+            )
+        
+        try:
+            # Import face detection agent
+            from utils import FaceDetectionAgent
+            import uuid
+            from datetime import datetime
+            
+            # Generate session ID for face detection
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            session_id = f"face_detection_{timestamp}_{uuid.uuid4().hex[:6]}"
+            
+            logger.info(f"Starting face detection for session: {session_id}")
+            
+            # Run face detection workflow with LangFuse tracing
+            face_agent = FaceDetectionAgent()
+            face_detection_result = face_agent.detect_faces_with_workflow(
+                embedded_images=embedded_images,
+                pdf_data=self.current_pdf_data,
+                session_id=session_id
+            )
+            
+            if face_detection_result["face_found"]:
+                # Face detected - show image and enable enhancement
+                face_img = face_detection_result["face_image"]
+                
+                # Convert base64 to image for display
+                import io
+                import base64
+                from PIL import Image
+                image_bytes = base64.b64decode(face_img['base64'])
+                detected_image = Image.open(io.BytesIO(image_bytes))
+                
+                # Store detected image for enhancement
+                self.detected_face_image = face_img
+                
+                result_msg = f"""
+✅ **Face detected successfully!**
+
+**Image Details:**
+- **Location:** Page {face_img['page_number']}
+- **Dimensions:** {face_img['width']} × {face_img['height']} pixels
+- **Format:** {face_img['format']}
+- **Size:** {format_file_size(face_img['size_bytes'])}
+
+**LangFuse Trace:** `profile_{self.current_pdf_data.get('pdf_info', {}).get('author', 'unknown')}`
+
+*Ready for LinkedIn optimization!*
+"""
+                
+                logger.info(f"Face detection successful for session: {session_id}")
+                return (
+                    result_msg,
+                    gr.update(value=detected_image, visible=True),  # Show detected image
+                    gr.update(visible=True),   # Keep detect button visible for re-detection
+                    gr.update(visible=True)    # Show enhance button
+                )
+            else:
+                # No face detected
+                result_msg = f"""
+❌ **No face detected in embedded images**
+
+**Images Analyzed:** {len(embedded_images)}
+**Result:** {face_detection_result["message"]}
+
+**LangFuse Trace:** `profile_{self.current_pdf_data.get('pdf_info', {}).get('author', 'unknown')}`
+
+*The resume doesn't contain a detectable profile picture.*
+"""
+                
+                logger.info(f"No face detected for session: {session_id}")
+                return (
+                    result_msg,
+                    gr.update(visible=False),  # Hide detected image
+                    gr.update(visible=True),   # Keep detect button visible for retry
+                    gr.update(visible=False)  # Keep enhance button hidden
+                )
+                
+        except Exception as e:
+            error_msg = f"""
+❌ **Face Detection Error**
+
+**Error:** {str(e)}
+
+Please try again or check your configuration.
+"""
+            logger.error(f"Face detection error: {str(e)}")
+            return (
+                error_msg,
+                gr.update(visible=False),  # Hide detected image
+                gr.update(visible=True),   # Keep detect button visible for retry
+                gr.update(visible=False)  # Keep enhance button hidden
+            )
+    
+    def enhance_image_for_linkedin(self) -> Tuple[gr.Row, gr.Image, gr.Image]:
+        """Step 2: Enhance detected face image for LinkedIn using Flux Kontext with LangFuse tracing"""
+        if not hasattr(self, 'detected_face_image') or not self.detected_face_image:
+            return (
+                gr.update(visible=False),  # Hide enhancement result
+                gr.update(),  # Original image
+                gr.update()   # Enhanced image
+            )
+        
+        try:
+            # Import required modules
+            import io
+            import base64
+            from PIL import Image
+            import uuid
+            from datetime import datetime
+            from flux_image_enhancer import FluxImageEnhancer, is_flux_configured
+            from langfuse.callback import CallbackHandler
+            
+            # Check if Flux is configured
+            if not is_flux_configured():
+                logger.error("Flux Kontext API not configured (missing BFL_API_KEY)")
+                return (
+                    gr.update(visible=False),  # Hide enhancement result
+                    gr.update(),  # Original image
+                    gr.update()   # Enhanced image
+                )
+            
+            # Generate session ID for image enhancement
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            session_id = f"enhancement_{timestamp}_{uuid.uuid4().hex[:6]}"
+            
+            # Extract author name for personalized tracing
+            author_name = self.current_pdf_data.get('pdf_info', {}).get('author', 'unknown')
+            if not author_name or author_name.lower() in ['unknown', '', 'none', 'null']:
+                author_name = 'unknown'
+            trace_name = f"image_enhancement_{author_name}"
+            
+            # Create LangFuse handler for image enhancement workflow
+            langfuse_handler = CallbackHandler(
+                session_id=session_id,
+                user_id="resume_user", 
+                trace_name=trace_name
+            )
+            logger.info(f"Created LangFuse handler for image enhancement - Session: {session_id}, Trace: {trace_name}")
+                
+            logger.info(f"Starting LinkedIn image enhancement for session: {session_id}")
+            
+            # Step 1: Image preparation
+            prep_span = langfuse_handler.langfuse.span(
+                name="image_preparation",
+                metadata={
+                    "step": "converting_base64_to_pil",
+                    "session_id": session_id,
+                    "author_name": author_name,
+                    "workflow_type": "image_enhancement",
+                    "original_image_info": {
+                        "page_number": self.detected_face_image.get('page_number'),
+                        "dimensions": f"{self.detected_face_image.get('width')}x{self.detected_face_image.get('height')}",
+                        "format": self.detected_face_image.get('format'),
+                        "size_bytes": self.detected_face_image.get('size_bytes')
+                    }
+                }
+            )
+            
+            try:
+                image_bytes = base64.b64decode(self.detected_face_image['base64'])
+                original_image = Image.open(io.BytesIO(image_bytes))
+                
+                prep_span.event(
+                    name="image_conversion_success",
+                    metadata={
+                        "original_size": f"{original_image.width}x{original_image.height}",
+                        "original_mode": original_image.mode,
+                        "conversion_successful": True
+                    }
+                )
+                prep_span.end()
+                
+                # Step 2: Flux Kontext enhancement
+                flux_span = langfuse_handler.langfuse.span(
+                    name="flux_kontext_enhancement",
+                    metadata={
+                        "step": "submitting_to_flux_api",
+                        "professional_prompt": "light blue blazer, white background, orderly hair, preserve face and gender, bust shot",
+                        "session_id": session_id
+                    }
+                )
+                
+                try:
+                    # Initialize Flux enhancer
+                    enhancer = FluxImageEnhancer()
+                    
+                    # Log API submission
+                    flux_span.event(
+                        name="flux_api_submission",
+                        metadata={"api_endpoint": "flux-kontext-pro"}
+                    )
+                    
+                    # Run enhancement
+                    enhanced_image = enhancer.enhance_image_sync(original_image)
+                    
+                    if enhanced_image:
+                        flux_span.event(
+                            name="flux_enhancement_success",
+                            metadata={
+                                "enhancement_successful": True,
+                                "enhanced_size": f"{enhanced_image.width}x{enhanced_image.height}",
+                                "enhanced_mode": enhanced_image.mode,
+                                "result": "professional_image_generated"
+                            }
+                        )
+                    else:
+                        flux_span.event(
+                            name="flux_enhancement_failed",
+                            metadata={
+                                "enhancement_successful": False,
+                                "error": "enhancement_returned_none"
+                            }
+                        )
+                        # Use original image as fallback
+                        enhanced_image = original_image.copy()
+                        
+                    flux_span.end()
+                    
+                except Exception as flux_error:
+                    flux_span.event(
+                        name="flux_enhancement_error",
+                        metadata={
+                            "enhancement_successful": False,
+                            "error_message": str(flux_error)
+                        }
+                    )
+                    flux_span.end()
+                    # Use original image as fallback
+                    enhanced_image = original_image.copy()
+                    logger.error(f"Flux enhancement failed: {flux_error}")
+                
+                # Step 3: LinkedIn optimization
+                linkedin_span = langfuse_handler.langfuse.span(
+                    name="linkedin_optimization",
+                    metadata={
+                        "step": "optimizing_for_linkedin",
+                        "target_dimensions": "800x800",
+                        "session_id": session_id
+                    }
+                )
+                
+                try:
+                    # Apply LinkedIn optimization
+                    final_image = enhancer.optimize_for_linkedin(enhanced_image)
+                    
+                    linkedin_span.event(
+                        name="linkedin_optimization_complete",
+                        metadata={
+                            "optimization_successful": True,
+                            "final_size": f"{final_image.width}x{final_image.height}",
+                            "background": "white",
+                            "format": "centered_bust",
+                            "ready_for_download": True
+                        }
+                    )
+                    linkedin_span.end()
+                    
+                except Exception as linkedin_error:
+                    linkedin_span.event(
+                        name="linkedin_optimization_error",
+                        metadata={
+                            "optimization_successful": False,
+                            "error_message": str(linkedin_error)
+                        }
+                    )
+                    linkedin_span.end()
+                    # Use enhanced image as fallback
+                    final_image = enhanced_image
+                    logger.error(f"LinkedIn optimization failed: {linkedin_error}")
+                
+                # Log workflow completion
+                completion_span = langfuse_handler.langfuse.span(
+                    name="workflow_completion",
+                    metadata={
+                        "workflow_status": "completed",
+                        "processing_successful": True,
+                        "enhancement_method": "flux_kontext_pro",
+                        "linkedin_optimized": True,
+                        "session_id": session_id
+                    }
+                )
+                completion_span.event(
+                    name="image_enhancement_workflow_complete",
+                    metadata={"final_result": "linkedin_ready_image_generated"}
+                )
+                completion_span.end()
+                
+            except Exception as prep_error:
+                prep_span.event(
+                    name="image_preparation_error",
+                    metadata={"error_message": str(prep_error)}
+                )
+                prep_span.end()
+                raise prep_error
+            
+            logger.info(f"LinkedIn image enhancement completed successfully for session: {session_id}")
+            
+            return (
+                gr.update(visible=True),   # Show enhancement result
+                gr.update(value=original_image),  # Show original
+                gr.update(value=final_image)   # Show enhanced
+            )
+            
+        except Exception as e:
+            logger.error(f"Image enhancement error: {str(e)}")
+            
+            # Log error to LangFuse
+            try:
+                error_span = langfuse_handler.langfuse.span(
+                    name="workflow_error",
+                    metadata={
+                        "workflow_status": "error",
+                        "error_message": str(e),
+                        "processing_successful": False,
+                        "session_id": session_id
+                    }
+                )
+                error_span.event(
+                    name="image_enhancement_workflow_failed",
+                    metadata={"error_details": str(e)}
+                )
+                error_span.end()
+            except Exception as log_error:
+                logger.warning(f"Failed to log error to LangFuse: {log_error}")
+                pass
+            
+            return (
+                gr.update(visible=False),  # Hide enhancement result
+                gr.update(),  # Original image
+                gr.update()   # Enhanced image
+            )
+    
     def analyze_resume_with_claude(self) -> str:
-        """Run Claude analysis on the current resume"""
+        """Legacy method - Run Claude analysis on the current resume"""
         if not self.current_pdf_data:
             return "❌ **No PDF processed yet.** Please upload and process a PDF first."
         
@@ -495,19 +1005,50 @@ def create_interface():
         # Analysis Tabs (only show when processing is successful)
         with gr.Tabs(visible=False) as analysis_tabs:
             with gr.TabItem("🎯 Experience Analysis"):
-                claude_analysis_btn = gr.Button(
-                    "🚀 Analyze Resume with Claude", 
+                # Step 1: Analysis
+                analyze_btn = gr.Button(
+                    "🔍 Analyze with AI", 
                     variant="primary",
                     size="lg"
                 )
-                claude_analysis_display = gr.Markdown(
-                    "Ready for AI analysis...",
-                    label="Experience Analysis Results"
+                analysis_display = gr.Markdown(
+                    "Ready for analysis...",
+                    label="Resume Analysis Results"
+                )
+                
+                # Step 2: Optimization (hidden initially)
+                optimize_btn = gr.Button(
+                    "✨ Create better Resume experience copy", 
+                    visible=False,
+                    variant="secondary",
+                    size="lg"
+                )
+                optimization_display = gr.Markdown(
+                    "",
+                    label="Optimized Resume Content"
                 )
             
             with gr.TabItem("🖼️ Image Analysis"):
-                image_analysis_btn = gr.Button("🔍 Get Face Detection Analysis")
-                image_analysis_display = gr.Markdown()
+                # Step 1: Face Detection
+                detect_btn = gr.Button("🔍 Face Detection", variant="primary", size="lg")
+                
+                with gr.Row():
+                    detection_result = gr.Markdown("Ready for face detection...")
+                    detected_image = gr.Image(visible=False, label="Detected Face")
+                
+                # Step 2: Image Enhancement (hidden initially)
+                enhance_btn = gr.Button(
+                    "🎨 Make Image better for LinkedIn", 
+                    visible=False,
+                    variant="secondary",
+                    size="lg"
+                )
+                
+                with gr.Row(visible=False) as enhancement_result:
+                    with gr.Column():
+                        original_image = gr.Image(label="Original", interactive=False)
+                    with gr.Column():
+                        enhanced_image = gr.Image(label="LinkedIn Optimized", interactive=False)
             
         
         def handle_file_upload(file):
@@ -538,15 +1079,26 @@ def create_interface():
             ]
         )
         
-        # Analysis event handlers
-        claude_analysis_btn.click(
-            fn=app.analyze_resume_with_claude,
-            outputs=[claude_analysis_display]
+        # Experience Analysis event handlers
+        analyze_btn.click(
+            fn=app.analyze_resume_strengths_weaknesses,
+            outputs=[analysis_display, analyze_btn, optimize_btn]
         )
         
-        image_analysis_btn.click(
-            fn=app.get_image_analysis,
-            outputs=[image_analysis_display]
+        optimize_btn.click(
+            fn=app.create_optimized_experience_copy,
+            outputs=[optimization_display]
+        )
+        
+        # Image Analysis event handlers
+        detect_btn.click(
+            fn=app.detect_face_progressive,
+            outputs=[detection_result, detected_image, detect_btn, enhance_btn]
+        )
+        
+        enhance_btn.click(
+            fn=app.enhance_image_for_linkedin,
+            outputs=[enhancement_result, original_image, enhanced_image]
         )
     
     return interface
