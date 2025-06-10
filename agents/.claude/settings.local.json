@@ -11,7 +11,9 @@
       "Bash(python:*)",
       "Bash(pip3 install:*)",
       "Bash(ls:*)",
-      "WebFetch(domain:gradio.app)"
+      "WebFetch(domain:gradio.app)",
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

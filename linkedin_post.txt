@@ -1,0 +1,40 @@
+🚀 Excited to share my latest AI project: LinkedIn Resume Analysis Agent! 
+
+Just built an intelligent multi-agent system that transforms how we approach resume optimization and professional image enhancement. This tool combines cutting-edge AI to analyze resumes and create LinkedIn-ready profile pictures automatically.
+
+🎯 What it does:
+• Analyzes resume content with AI-powered insights
+• Detects faces in uploaded resumes using computer vision
+• Enhances profile pictures for professional LinkedIn presence
+• Provides actionable recommendations for career improvement
+
+🔧 Tech Stack Highlights:
+• LangGraph for multi-agent workflows
+• Claude AI for intelligent resume analysis
+• Nebius AI Studio for face detection
+• Black Forest Labs' Flux Kontext for image enhancement
+• Gradio for seamless user experience
+
+💡 The magic happens when multiple AI systems work together - each specialized for different tasks but orchestrated as one cohesive experience.
+
+🙏 Huge thanks to the incredible teams at:
+• Anthropic for Claude's analytical capabilities
+• Nebius for their vision AI infrastructure
+• Black Forest Labs for revolutionary image generation
+• HuggingFace for the amazing deployment platform
+Langraph for their amazing (and cruel) framework
+• The open-source community for foundational tools
+
+This project showcases how we can combine multiple AI services to solve real-world problems. The future of AI isn't just about single models - it's about intelligent orchestration of specialized systems.
+
+What's your biggest challenge when updating your resume or LinkedIn profile? 🤔
+
+#AI #MachineLearning #Resume #LinkedIn #CareerDevelopment #MultiAgent #Innovation #TechStack #OpenSource #ProfessionalDevelopment #ArtificialIntelligence #ComputerVision #ImageGeneration
+
+---
+
+Ready to transform your professional presence? Try the agent and let me know what you think!
+
+🔗 [Link to your deployment]
+
+PS: This agent was built as part of exploring multi-agent AI systems and their practical applications in career development.
